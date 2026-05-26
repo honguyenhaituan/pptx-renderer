@@ -17,10 +17,13 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import posixpath
 import random
 import sys
 from pathlib import Path
+from zipfile import ZIP_DEFLATED, ZipFile
 
+from lxml import etree
 from pptx import Presentation
 from pptx.chart.data import BubbleChartData, CategoryChartData, XyChartData
 from pptx.dml.color import RGBColor
@@ -49,9 +52,76 @@ SLIDE_H = Inches(7.5)
 
 CaseDef = dict  # {name: str, build_fn: Callable[[Presentation], None]}
 
+PML_NS = "http://schemas.openxmlformats.org/presentationml/2006/main"
+REL_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
+PML_REL_PREFIX = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+NS = {"p": PML_NS, "pr": REL_NS}
+
 
 def _emu(inches: float) -> int:
     return int(Inches(inches))
+
+
+def _rels_path(part_name: str) -> str:
+    directory, filename = posixpath.split(part_name)
+    return posixpath.join(directory, "_rels", f"{filename}.rels")
+
+
+def _resolve_part_target(part_name: str, target: str) -> str:
+    return posixpath.normpath(posixpath.join(posixpath.dirname(part_name), target))
+
+
+def _relationship_target(zf: ZipFile, part_name: str, rel_suffix: str) -> str | None:
+    root = etree.fromstring(zf.read(_rels_path(part_name)))
+    for rel in root.xpath(".//pr:Relationship", namespaces=NS):
+        rel_type = rel.get("Type", "")
+        target = rel.get("Target")
+        if target and rel_type == f"{PML_REL_PREFIX}{rel_suffix}":
+            return _resolve_part_target(part_name, target)
+    return None
+
+
+def _patch_placeholder_idx_inheritance_case(pptx_path: Path) -> None:
+    """Make slide placeholders inherit type through idx, matching real OOXML edge cases."""
+    slide_part = "ppt/slides/slide1.xml"
+
+    with ZipFile(pptx_path, "r") as zf:
+        entries = [(info, zf.read(info.filename)) for info in zf.infolist()]
+        layout_part = _relationship_target(zf, slide_part, "/slideLayout")
+        if layout_part is None:
+            raise RuntimeError("placeholder inheritance case slide has no slideLayout relationship")
+
+        slide_root = etree.fromstring(dict((info.filename, data) for info, data in entries)[slide_part])
+        layout_root = etree.fromstring(dict((info.filename, data) for info, data in entries)[layout_part])
+
+    slide_title_ph = slide_root.xpath(".//p:ph[@type='title']", namespaces=NS)
+    if not slide_title_ph:
+        raise RuntimeError("placeholder inheritance case has no slide title placeholder")
+    slide_title_ph[0].attrib.pop("type", None)
+    slide_title_ph[0].set("idx", "0")
+
+    slide_body_ph = slide_root.xpath(".//p:ph[@idx='1']", namespaces=NS)
+    if not slide_body_ph:
+        raise RuntimeError("placeholder inheritance case has no slide body placeholder")
+    slide_body_ph[0].attrib.pop("type", None)
+
+    layout_title_ph = layout_root.xpath(".//p:ph[@type='title']", namespaces=NS)
+    if not layout_title_ph:
+        raise RuntimeError("placeholder inheritance case has no layout title placeholder")
+    layout_title_ph[0].set("idx", "0")
+
+    patched = {
+        slide_part: etree.tostring(slide_root, encoding="UTF-8", xml_declaration=True),
+        layout_part: etree.tostring(layout_root, encoding="UTF-8", xml_declaration=True),
+    }
+    tmp_path = pptx_path.with_name(f"{pptx_path.name}.tmp")
+    if tmp_path.exists():
+        tmp_path.unlink()
+
+    with ZipFile(tmp_path, "w", ZIP_DEFLATED) as out:
+        for info, data in entries:
+            out.writestr(info, patched.get(info.filename, data))
+    tmp_path.replace(pptx_path)
 
 
 # ---------------------------------------------------------------------------
@@ -62,13 +132,16 @@ def _build_text_cases() -> list[CaseDef]:
     cases: list[CaseDef] = []
     seq = 0
 
-    def _add(slug: str, build_fn):
+    def _add(slug: str, build_fn, postprocess_fn=None):
         nonlocal seq
         seq += 1
-        cases.append({
+        case = {
             "name": f"oracle-pypptx-text-{seq:04d}-{slug}",
             "build_fn": build_fn,
-        })
+        }
+        if postprocess_fn is not None:
+            case["postprocess_fn"] = postprocess_fn
+        cases.append(case)
 
     # --- Font families ---
     font_families = [
@@ -296,6 +369,29 @@ def _build_text_cases() -> list[CaseDef]:
             p.space_after = Pt(12)
             p.space_before = Pt(6)
     _add("line-spacing", _build_spacing)
+
+    # --- Placeholder idx-only inheritance (slide ph idx -> layout/master ph type) ---
+    def _build_placeholder_idx_inheritance(prs):
+        sld = prs.slides.add_slide(prs.slide_layouts[1])  # Title and Content
+
+        sld.shapes.title.text = "Placeholder Inheritance Title"
+
+        body = sld.placeholders[1]
+        tf = body.text_frame
+        tf.clear()
+        tf.word_wrap = True
+
+        p1 = tf.paragraphs[0]
+        p1.text = "Body placeholder inherits bullet and master text size"
+
+        p2 = tf.add_paragraph()
+        p2.text = "Second line also inherits body placeholder style"
+        p2.level = 0
+    _add(
+        "placeholder-idx-inheritance",
+        _build_placeholder_idx_inheritance,
+        _patch_placeholder_idx_inheritance_case,
+    )
 
     return cases
 
@@ -838,6 +934,8 @@ def _generate_pptx(case_def: CaseDef, output_path: str | Path) -> None:
     case_def["build_fn"](prs)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     prs.save(str(output_path))
+    if postprocess_fn := case_def.get("postprocess_fn"):
+        postprocess_fn(output_path)
 
 
 def _write_case_json(case_def: CaseDef, cases_dir: Path) -> Path:

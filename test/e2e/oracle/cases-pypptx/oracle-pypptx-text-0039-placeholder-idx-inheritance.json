@@ -1,0 +1,13 @@
+{
+  "name": "oracle-pypptx-text-0039-placeholder-idx-inheritance",
+  "generator": "python-pptx",
+  "slides": [
+    {
+      "nodes": [
+        {
+          "kind": "pypptx-generated"
+        }
+      ]
+    }
+  ]
+}

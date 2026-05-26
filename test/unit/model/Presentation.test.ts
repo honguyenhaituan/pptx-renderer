@@ -473,6 +473,104 @@ describe('buildPresentation', () => {
       expect(node.size.w).toBeGreaterThan(0);
     });
 
+    it('inherits placeholder type from layout when slide placeholder declares only idx', () => {
+      const slideXml = `
+        <sld xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+          <cSld>
+            <spTree>
+              <sp>
+                <nvSpPr><cNvPr id="2" name="Title"/><nvPr><ph idx="1"/></nvPr></nvSpPr>
+                <spPr>
+                  <xfrm><off x="0" y="0"/><ext cx="0" cy="0"/></xfrm>
+                  <prstGeom prst="rect"><avLst/></prstGeom>
+                </spPr>
+              </sp>
+            </spTree>
+          </cSld>
+        </sld>
+      `;
+      const layoutXml = `
+        <sldLayout>
+          <cSld>
+            <spTree>
+              <sp>
+                <nvSpPr><cNvPr id="5" name="Layout Title"/><nvPr><ph type="title" idx="1"/></nvPr></nvSpPr>
+                <spPr>
+                  <xfrm><off x="457200" y="914400"/><ext cx="6858000" cy="1143000"/></xfrm>
+                </spPr>
+              </sp>
+            </spTree>
+          </cSld>
+        </sldLayout>
+      `;
+      const files = makeMinimalFiles({
+        slides: new Map([['ppt/slides/slide1.xml', slideXml]]),
+        slideLayouts: new Map([['ppt/slideLayouts/slideLayout1.xml', layoutXml]]),
+      });
+
+      const pres = buildPresentation(files);
+      const node = pres.slides[0].nodes[0];
+
+      expect(node.placeholder).toEqual({ idx: 1, type: 'title' });
+    });
+
+    it('inherits placeholder type from master when matching layout placeholder has no type', () => {
+      const slideXml = `
+        <sld xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+          <cSld>
+            <spTree>
+              <sp>
+                <nvSpPr><cNvPr id="2" name="Body"/><nvPr><ph idx="2"/></nvPr></nvSpPr>
+                <spPr>
+                  <xfrm><off x="0" y="0"/><ext cx="0" cy="0"/></xfrm>
+                  <prstGeom prst="rect"><avLst/></prstGeom>
+                </spPr>
+              </sp>
+            </spTree>
+          </cSld>
+        </sld>
+      `;
+      const layoutXml = `
+        <sldLayout>
+          <cSld>
+            <spTree>
+              <sp>
+                <nvSpPr><cNvPr id="5" name="Layout Body"/><nvPr><ph idx="2"/></nvPr></nvSpPr>
+                <spPr>
+                  <xfrm><off x="457200" y="914400"/><ext cx="6858000" cy="4114800"/></xfrm>
+                </spPr>
+              </sp>
+            </spTree>
+          </cSld>
+        </sldLayout>
+      `;
+      const masterXml = `
+        <sldMaster>
+          <clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2"/>
+          <cSld>
+            <spTree>
+              <sp>
+                <nvSpPr><cNvPr id="7" name="Master Body"/><nvPr><ph type="body" idx="2"/></nvPr></nvSpPr>
+                <spPr>
+                  <xfrm><off x="914400" y="1828800"/><ext cx="7315200" cy="3657600"/></xfrm>
+                </spPr>
+              </sp>
+            </spTree>
+          </cSld>
+        </sldMaster>
+      `;
+      const files = makeMinimalFiles({
+        slides: new Map([['ppt/slides/slide1.xml', slideXml]]),
+        slideLayouts: new Map([['ppt/slideLayouts/slideLayout1.xml', layoutXml]]),
+        slideMasters: new Map([['ppt/slideMasters/slideMaster1.xml', masterXml]]),
+      });
+
+      const pres = buildPresentation(files);
+      const node = pres.slides[0].nodes[0];
+
+      expect(node.placeholder).toEqual({ idx: 2, type: 'body' });
+    });
+
     it('inherits bodyPr from layout placeholder for text rendering', () => {
       const slideXml = `
         <sld xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">

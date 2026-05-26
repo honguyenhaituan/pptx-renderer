@@ -327,6 +327,22 @@ async def get_http_client() -> httpx.AsyncClient:
 
 # Paths that Python server handles directly (not proxied)
 PYTHON_HANDLED_PREFIXES = ("/api/", "/testdata/")
+VITE_PROXY_REQUEST_HEADERS = (
+    "accept",
+    "accept-language",
+    "user-agent",
+    "range",
+    "if-none-match",
+    "if-modified-since",
+)
+
+
+def _vite_proxy_headers(headers) -> dict[str, str]:
+    return {
+        name: value
+        for name in VITE_PROXY_REQUEST_HEADERS
+        if (value := headers.get(name)) is not None
+    }
 
 
 @app.middleware("http")
@@ -342,7 +358,7 @@ async def vite_proxy_middleware(request, call_next):
     if request.url.query:
         target_url += f"?{request.url.query}"
     try:
-        resp = await client.get(target_url)
+        resp = await client.get(target_url, headers=_vite_proxy_headers(request.headers))
         # Filter out hop-by-hop headers
         headers = {
             k: v for k, v in resp.headers.items()

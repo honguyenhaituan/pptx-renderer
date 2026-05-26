@@ -274,6 +274,32 @@ describe('TextRenderer — renderTextBody', () => {
       expect(container.textContent).toContain('Bullet item');
     });
 
+    it('sizes bullet glyph from inherited paragraph defRPr', () => {
+      const body = makeTextBody({
+        listStyle: `
+          <lstStyle xmlns="http://schemas.openxmlformats.org/drawingml/2006/main">
+            <lvl1pPr>
+              <buFont typeface="Arial"/>
+              <buChar char="•"/>
+              <defRPr sz="3200"/>
+            </lvl1pPr>
+          </lstStyle>
+        `,
+        paragraphs: [{
+          runs: [{ text: 'Body placeholder item' }],
+          level: 0,
+        }],
+      });
+
+      const container = renderToContainer(body);
+      const bulletSpan = Array.from(container.querySelectorAll('span')).find((span) =>
+        span.textContent?.startsWith('•'),
+      ) as HTMLElement | undefined;
+
+      expect(bulletSpan).toBeDefined();
+      expect(bulletSpan!.style.fontSize).toBe('32pt');
+    });
+
     it('suppresses bullet when buNone is present', () => {
       const body = makeTextBody({
         paragraphs: [{

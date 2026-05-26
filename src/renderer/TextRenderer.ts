@@ -673,6 +673,7 @@ export function renderTextBody(
       if (merged.bulletFont) {
         bulletSpan.style.fontFamily = merged.bulletFont;
       }
+      bulletSpan.style.fontSize = `${effectiveFontSize * fontScale}pt`;
       // Bullet color: 1) explicit buClr from list style, 2) paragraph defRPr, 3) first run's color (so bullet matches text), 4) cell/fallback
       let bulletColor: string | undefined;
       if (merged.bulletColorNode && merged.bulletColorNode.exists()) {

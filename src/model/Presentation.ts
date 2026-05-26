@@ -11,7 +11,7 @@ import { ThemeData, parseTheme } from './Theme';
 import { MasterData, parseMaster } from './Master';
 import { LayoutData, parseLayout, PlaceholderEntry } from './Layout';
 import { SlideData, SlideNode, parseSlide } from './Slide';
-import { Position, Size } from './nodes/BaseNode';
+import { PlaceholderInfo, Position, Size } from './nodes/BaseNode';
 
 export interface PresentationData {
   width: number;
@@ -433,6 +433,15 @@ function getPhBodyPr(phNode: SafeXmlNode): SafeXmlNode | undefined {
   return bodyPr.exists() ? bodyPr : undefined;
 }
 
+function inheritPlaceholderType(target: PlaceholderInfo, sourceNode: SafeXmlNode): void {
+  if (target.type) return;
+
+  const source = getPhInfo(sourceNode);
+  if (source.type) {
+    target.type = source.type;
+  }
+}
+
 function resolveNodesPlaceholders(
   nodes: SlideNode[],
   layout: LayoutData | undefined,
@@ -448,12 +457,18 @@ function resolveNodesPlaceholders(
     if (!node.placeholder) continue;
 
     const { type, idx } = node.placeholder;
+    const findMasterMatch = (): SafeXmlNode | undefined =>
+      master
+        ? findMatchingPlaceholder(master.placeholders, node.placeholder?.type ?? type, idx)
+        : undefined;
     const sizeIsEmpty = node.size.w === 0 && node.size.h === 0;
     const positionLooksDefault = node.position.y < 5; // y=0 or near top → use layout position
 
     if (layout) {
       const layoutMatch = findMatchingLayoutPlaceholder(layout.placeholders, type, idx);
       if (layoutMatch) {
+        inheritPlaceholderType(node.placeholder, layoutMatch.node);
+
         const xfrm = layoutMatch.absoluteXfrm ?? getPhXfrm(layoutMatch.node);
         if (xfrm) {
           if (sizeIsEmpty) {
@@ -472,29 +487,35 @@ function resolveNodesPlaceholders(
           }
         }
 
-        if (xfrm) continue;
+        if (xfrm) {
+          const masterMatch = findMasterMatch();
+          if (masterMatch) {
+            inheritPlaceholderType(node.placeholder, masterMatch);
+          }
+          continue;
+        }
       }
     }
 
-    if (master) {
-      const match = findMatchingPlaceholder(master.placeholders, type, idx);
-      if (match) {
-        const xfrm = getPhXfrm(match);
-        if (xfrm) {
-          if (sizeIsEmpty) {
-            node.position = xfrm.position;
-            node.size = xfrm.size;
-          } else if (positionLooksDefault) {
-            node.position = xfrm.position;
-          }
-        }
+    const masterMatch = findMasterMatch();
+    if (masterMatch) {
+      inheritPlaceholderType(node.placeholder, masterMatch);
 
-        // Inherit bodyPr from master placeholder as fallback
-        if ('textBody' in node && node.textBody && !node.textBody.layoutBodyProperties) {
-          const masterBodyPr = getPhBodyPr(match);
-          if (masterBodyPr) {
-            node.textBody.layoutBodyProperties = masterBodyPr;
-          }
+      const xfrm = getPhXfrm(masterMatch);
+      if (xfrm) {
+        if (sizeIsEmpty) {
+          node.position = xfrm.position;
+          node.size = xfrm.size;
+        } else if (positionLooksDefault) {
+          node.position = xfrm.position;
+        }
+      }
+
+      // Inherit bodyPr from master placeholder as fallback
+      if ('textBody' in node && node.textBody && !node.textBody.layoutBodyProperties) {
+        const masterBodyPr = getPhBodyPr(masterMatch);
+        if (masterBodyPr) {
+          node.textBody.layoutBodyProperties = masterBodyPr;
         }
       }
     }
