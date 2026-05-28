@@ -20,6 +20,7 @@
 // ---------------------------------------------------------------------------
 
 let _pdfjsUrl: string | null = null;
+let _pdfWorkerUrl: string | null = null;
 
 function getPdfjsUrl(): string | null {
   if (_pdfjsUrl !== null) return _pdfjsUrl;
@@ -32,13 +33,24 @@ function getPdfjsUrl(): string | null {
   return _pdfjsUrl || null;
 }
 
+function getPdfWorkerUrl(): string | null {
+  if (_pdfWorkerUrl !== null) return _pdfWorkerUrl;
+  try {
+    // pdfjs still needs its own workerSrc even when invoked from our isolated worker.
+    _pdfWorkerUrl = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
+  } catch {
+    _pdfWorkerUrl = '';
+  }
+  return _pdfWorkerUrl || null;
+}
+
 // ---------------------------------------------------------------------------
 // Worker-based renderer (fully isolated from main thread pdfjs)
 // ---------------------------------------------------------------------------
 
 /**
  * Inline source for the PDF render worker.
- * Receives: { id, pdfData, width, height, pdfjsUrl }
+ * Receives: { id, pdfData, width, height, pdfjsUrl, pdfWorkerUrl }
  * Posts back: { id, blob } or { id, error }
  *
  * The worker loads its OWN pdfjs instance via dynamic import, so its static
@@ -51,11 +63,11 @@ const WORKER_SRC = /* js */ `
 let pdfjsLib = null;
 
 self.onmessage = async (e) => {
-  const { id, pdfData, width, height, pdfjsUrl } = e.data;
+  const { id, pdfData, width, height, pdfjsUrl, pdfWorkerUrl } = e.data;
   try {
     if (!pdfjsLib) {
       pdfjsLib = await import(pdfjsUrl);
-      pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+      pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
     }
 
     const doc = await pdfjsLib.getDocument({ data: pdfData }).promise;
@@ -135,6 +147,7 @@ function renderInWorker(
   width: number,
   height: number,
   pdfjsUrl: string,
+  pdfWorkerUrl: string,
 ): Promise<Blob | null> {
   return new Promise((resolve) => {
     const worker = getWorker(pdfjsUrl);
@@ -151,7 +164,7 @@ function renderInWorker(
 
     // Transfer the buffer to avoid copying
     const copy = pdfData.slice(); // copy so caller retains original
-    worker.postMessage({ id, pdfData: copy, width, height, pdfjsUrl }, [copy.buffer]);
+    worker.postMessage({ id, pdfData: copy, width, height, pdfjsUrl, pdfWorkerUrl }, [copy.buffer]);
 
     // Timeout: if worker doesn't respond in 15s, give up
     setTimeout(() => {
@@ -182,13 +195,19 @@ export async function renderPdfToImage(
   height: number,
 ): Promise<string | null> {
   const pdfjsUrl = getPdfjsUrl();
+  const pdfWorkerUrl = getPdfWorkerUrl();
 
-  if (!pdfjsUrl || typeof OffscreenCanvas === 'undefined' || typeof Worker === 'undefined') {
+  if (
+    !pdfjsUrl ||
+    !pdfWorkerUrl ||
+    typeof OffscreenCanvas === 'undefined' ||
+    typeof Worker === 'undefined'
+  ) {
     return null;
   }
 
   try {
-    const blob = await renderInWorker(pdfData, width, height, pdfjsUrl);
+    const blob = await renderInWorker(pdfData, width, height, pdfjsUrl, pdfWorkerUrl);
     if (blob) return URL.createObjectURL(blob);
   } catch {
     // Worker failed — no fallback, return null

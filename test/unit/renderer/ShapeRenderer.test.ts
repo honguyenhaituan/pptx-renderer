@@ -503,6 +503,43 @@ describe('ShapeRenderer', () => {
     }
   });
 
+  it('top-aligns wrapping spAutoFit text boxes without an explicit anchor (oracle-pypptx-text-0007-font-impact)', () => {
+    const xml = `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr>
+          <p:cNvPr id="2" name="TextBox 1"/>
+          <p:cNvSpPr txBox="1"/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="914400" y="914400"/><a:ext cx="7315200" cy="1828800"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:noFill/>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr wrap="square"><a:spAutoFit/></a:bodyPr>
+          <a:lstStyle/>
+          <a:p>
+            <a:r>
+              <a:rPr sz="2800"><a:latin typeface="Impact"/></a:rPr>
+              <a:t>The quick brown fox jumps over the lazy dog — Impact</a:t>
+            </a:r>
+          </a:p>
+        </p:txBody>
+      </p:sp>
+    `;
+
+    const el = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+    const textContainer = Array.from(el.querySelectorAll('div')).find(
+      (div) =>
+        div.textContent?.includes('quick brown fox') && div.style.flexDirection === 'column',
+    ) as HTMLElement | undefined;
+
+    expect(textContainer).toBeDefined();
+    expect(textContainer!.style.justifyContent).toBe('flex-start');
+  });
+
   it('does not shrink narrow spAutoFit axis labels when text overflow is explicit (xcloud-plan slides 8 and 79)', () => {
     const isFitContainer = (el: HTMLElement) =>
       el.style.display === 'flex' && el.style.flexDirection === 'column';
@@ -633,6 +670,78 @@ describe('ShapeRenderer', () => {
       expect(textContainer!.style.transform).toContain('scale(');
       const scale = Number(textContainer!.style.transform.match(/scale\(([^)]+)\)/)?.[1]);
       expect(scale).toBeLessThan(1);
+    } finally {
+      clientWidthSpy.mockRestore();
+      clientHeightSpy.mockRestore();
+      scrollWidthSpy.mockRestore();
+      scrollHeightSpy.mockRestore();
+    }
+  });
+
+  it('does not apply implicit single-line shrink to bullet labels without autofit (xcloud-solution slide 26)', () => {
+    const isFitContainer = (el: HTMLElement) =>
+      el.style.display === 'flex' && el.style.flexDirection === 'column';
+    const clientWidthSpy = vi
+      .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 142 : 0;
+      });
+    const clientHeightSpy = vi
+      .spyOn(HTMLElement.prototype, 'clientHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 19 : 0;
+      });
+    const scrollWidthSpy = vi
+      .spyOn(HTMLElement.prototype, 'scrollWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) && this.style.whiteSpace === 'nowrap' ? 224 : 142;
+      });
+    const scrollHeightSpy = vi
+      .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) && this.style.whiteSpace === 'nowrap' ? 30 : 30;
+      });
+
+    try {
+      const xml = `
+        <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+              xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <p:nvSpPr>
+            <p:cNvPr id="46" name="矩形 46"/>
+            <p:cNvSpPr/>
+            <p:nvPr/>
+          </p:nvSpPr>
+          <p:spPr>
+            <a:xfrm><a:off x="8029893" y="2555512"/><a:ext cx="1350181" cy="182621"/></a:xfrm>
+            <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+            <a:noFill/>
+          </p:spPr>
+          <p:txBody>
+            <a:bodyPr rtlCol="0" anchor="ctr"/>
+            <a:lstStyle/>
+            <a:p>
+              <a:pPr marL="171450" indent="-171450" algn="l">
+                <a:lnSpc><a:spcPct val="100000"/></a:lnSpc>
+                <a:spcBef><a:spcPts val="600"/></a:spcBef>
+                <a:spcAft><a:spcPts val="0"/></a:spcAft>
+                <a:buFont typeface="Arial"/>
+                <a:buChar char="•"/>
+              </a:pPr>
+              <a:r><a:rPr sz="900"><a:latin typeface="微软雅黑"/></a:rPr><a:t>应对常规流量</a:t></a:r>
+            </a:p>
+          </p:txBody>
+        </p:sp>
+      `;
+
+      const el = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+      const textContainer = Array.from(el.querySelectorAll('div')).find(
+        (div) => div.textContent?.includes('应对常规流量') && div.style.flexDirection === 'column',
+      ) as HTMLElement | undefined;
+
+      expect(textContainer).toBeDefined();
+      expect(textContainer!.style.transform).not.toContain('scale(');
+      expect(textContainer!.style.width).toBe('100%');
+      expect(textContainer!.style.height).toBe('100%');
     } finally {
       clientWidthSpy.mockRestore();
       clientHeightSpy.mockRestore();
@@ -1716,6 +1825,58 @@ describe('ShapeRenderer', () => {
     // 2) line shadow spread should stay near stroke thickness, not line length.
     expect(Math.abs(offsetX)).toBeLessThan(200);
     expect(spread).toBeLessThan(20);
+  });
+
+  it('applies scaled outer shadows to non-line SVG paths instead of the wrapper box (xcloud-intro slide 12 trapezoid)', () => {
+    const xml = `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr>
+          <p:cNvPr id="455" name="梯形 454"/>
+          <p:cNvSpPr/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm>
+            <a:off x="757240" y="1751326"/>
+            <a:ext cx="7701328" cy="304594"/>
+          </a:xfrm>
+          <a:prstGeom prst="trapezoid">
+            <a:avLst><a:gd name="adj" fmla="val 109483"/></a:avLst>
+          </a:prstGeom>
+          <a:gradFill>
+            <a:gsLst>
+              <a:gs pos="100000"><a:sysClr val="window" lastClr="FFFFFF"/></a:gs>
+              <a:gs pos="0"><a:sysClr val="window" lastClr="FFFFFF"><a:alpha val="0"/></a:sysClr></a:gs>
+            </a:gsLst>
+            <a:lin ang="5400000" scaled="0"/>
+          </a:gradFill>
+          <a:ln w="11589" cap="flat" cmpd="sng" algn="in">
+            <a:gradFill>
+              <a:gsLst>
+                <a:gs pos="0"><a:srgbClr val="3B51D3"><a:alpha val="0"/></a:srgbClr></a:gs>
+                <a:gs pos="100000"><a:srgbClr val="3B51D3"><a:alpha val="50000"/></a:srgbClr></a:gs>
+              </a:gsLst>
+              <a:lin ang="5400000" scaled="1"/>
+            </a:gradFill>
+          </a:ln>
+          <a:effectLst>
+            <a:outerShdw blurRad="139065" sx="102000" sy="102000" algn="t" rotWithShape="0">
+              <a:srgbClr val="C9D0F0"><a:lumMod val="50000"/><a:alpha val="30000"/></a:srgbClr>
+            </a:outerShdw>
+          </a:effectLst>
+        </p:spPr>
+      </p:sp>
+    `;
+
+    const el = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+    const path = el.querySelector('svg > path');
+    const filter = el.querySelector('filter');
+
+    expect(el.style.boxShadow).toBe('');
+    expect(path?.getAttribute('filter')).toContain('url(#shape-shadow-');
+    expect(filter).toBeTruthy();
+    expect(filter?.querySelector('feDropShadow')).toBeTruthy();
   });
 
   it('treats spAutoFit as bounded text fit to prevent overflow bleed', () => {

@@ -296,6 +296,14 @@ describe('resolveLineStyle', () => {
     expect(result.dash).toBe('dashed');
   });
 
+  it('uses the Office default stroke width for an explicit colored line without w (xcloud-solution slide 26 cloud)', () => {
+    const ctx = createMockRenderContext();
+    const node = xmlNode(`<ln><solidFill><srgbClr val="3B51D3"/></solidFill></ln>`);
+    const result = resolveLineStyle(node, ctx);
+    expect(result.width).toBeCloseTo(1, 2);
+    expect(result.color).toBe('#3B51D3');
+  });
+
   it('resolves dotted line', () => {
     const ctx = createMockRenderContext();
     const node = xmlNode(`<ln w="12700"><solidFill><srgbClr val="000000"/></solidFill><prstDash val="dot"/></ln>`);

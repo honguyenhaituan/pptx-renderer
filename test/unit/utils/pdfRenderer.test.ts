@@ -126,4 +126,70 @@ describe('pdfRenderer', () => {
     // No pdfjs API should be invoked on the main thread at all
     expect(pdfjsMock.getDocument).not.toHaveBeenCalled();
   });
+
+  it('passes the pdfjs worker module URL to the isolated renderer worker', async () => {
+    vi.resetModules();
+
+    const originalWorker = globalThis.Worker;
+    const originalOffscreenCanvas = globalThis.OffscreenCanvas;
+    let postedMessage: Record<string, unknown> | undefined;
+
+    class MockWorker {
+      onmessage: ((event: MessageEvent) => void) | null = null;
+      onerror: ((event: ErrorEvent) => void) | null = null;
+
+      constructor(
+        readonly url: string,
+        readonly options?: WorkerOptions,
+      ) {}
+
+      postMessage(message: Record<string, unknown>): void {
+        postedMessage = message;
+        setTimeout(() => {
+          this.onmessage?.({
+            data: { id: message.id, blob: new Blob(['png'], { type: 'image/png' }) },
+          } as MessageEvent);
+        }, 0);
+      }
+    }
+
+    try {
+      Object.defineProperty(globalThis, 'Worker', {
+        configurable: true,
+        value: MockWorker,
+      });
+      Object.defineProperty(globalThis, 'OffscreenCanvas', {
+        configurable: true,
+        value: class MockOffscreenCanvas {},
+      });
+
+      const createObjectUrlSpy = vi
+        .spyOn(URL, 'createObjectURL')
+        .mockReturnValueOnce('blob:renderer-worker')
+        .mockReturnValueOnce('blob:rendered-pdf');
+
+      const mod = await import('../../../src/utils/pdfRenderer');
+      const result = await mod.renderPdfToImage(
+        new Uint8Array([0x25, 0x50, 0x44, 0x46]),
+        32,
+        24,
+      );
+
+      expect(result).toBe('blob:rendered-pdf');
+      expect(postedMessage?.pdfjsUrl).toEqual(expect.stringContaining('pdf'));
+      expect(postedMessage?.pdfWorkerUrl).toEqual(expect.stringContaining('pdf.worker'));
+
+      createObjectUrlSpy.mockRestore();
+    } finally {
+      Object.defineProperty(globalThis, 'Worker', {
+        configurable: true,
+        value: originalWorker,
+      });
+      Object.defineProperty(globalThis, 'OffscreenCanvas', {
+        configurable: true,
+        value: originalOffscreenCanvas,
+      });
+      vi.resetModules();
+    }
+  });
 });

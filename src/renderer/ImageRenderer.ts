@@ -564,7 +564,7 @@ function renderEmfPdf(
     return;
   }
 
-  renderPdfToImage(pdfData, node.size.w, node.size.h)
+  const task = renderPdfToImage(pdfData, node.size.w, node.size.h)
     .then((url) => {
       if (url) {
         ctx.mediaUrlCache.set(cacheKey, url);
@@ -574,6 +574,7 @@ function renderEmfPdf(
     .catch(() => {
       // PDF rendering failed — leave wrapper empty (transparent)
     });
+  ctx.asyncTasks?.push(task);
 }
 
 /**
@@ -599,12 +600,17 @@ function renderEmfBitmap(
   if (!canvasCtx) return;
 
   canvasCtx.putImageData(imageData, 0, 0);
-  canvas.toBlob((blob) => {
-    if (!blob) return;
-    const url = URL.createObjectURL(blob);
-    ctx.mediaUrlCache.set(cacheKey, url);
-    wrapper.appendChild(createFillImage(url));
-  }, 'image/png');
+  const task = new Promise<void>((resolve) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        ctx.mediaUrlCache.set(cacheKey, url);
+        wrapper.appendChild(createFillImage(url));
+      }
+      resolve();
+    }, 'image/png');
+  });
+  ctx.asyncTasks?.push(task);
 }
 
 /**

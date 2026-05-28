@@ -130,7 +130,7 @@
           const targetSlide = slideParam !== null ? parseInt(slideParam, 10) : 0;
           const idx = Math.max(0, Math.min(targetSlide, presentation.slides.length - 1));
           slideSelect.value = String(idx);
-          showSlide(idx);
+          await showSlide(idx);
         } catch (e) {
           container.innerHTML = `<div class="loading" style="color:#e94560">${e.message}</div>`;
           statusEl.textContent = `Error: ${e.message}`;
@@ -138,8 +138,10 @@
         }
       }
 
-      function showSlide(idx) {
+      async function showSlide(idx) {
         if (!presentation) return;
+        window.__renderDone = false;
+        window.__renderError = undefined;
         currentSlide = idx;
         slideSelect.value = String(idx);
 
@@ -170,6 +172,13 @@
         btnNext.disabled = idx >= presentation.slides.length - 1;
         statusEl.textContent = `Slide ${idx + 1} / ${presentation.slides.length} — ${presentation.width}×${presentation.height}px`;
 
+        try {
+          await handle.ready;
+        } catch (e) {
+          window.__renderError = e?.message || String(e);
+          throw e;
+        }
+
         window.__renderDone = true;
         window.__slideWidth = presentation.width;
         window.__slideHeight = presentation.height;
@@ -180,16 +189,28 @@
       });
 
       slideSelect.addEventListener('change', () => {
-        showSlide(parseInt(slideSelect.value, 10));
+        showSlide(parseInt(slideSelect.value, 10)).catch((e) => {
+          statusEl.textContent = `Error: ${e.message || e}`;
+          console.error(e);
+        });
       });
 
       btnPrev.addEventListener('click', () => {
-        if (currentSlide > 0) showSlide(currentSlide - 1);
+        if (currentSlide > 0) {
+          showSlide(currentSlide - 1).catch((e) => {
+            statusEl.textContent = `Error: ${e.message || e}`;
+            console.error(e);
+          });
+        }
       });
 
       btnNext.addEventListener('click', () => {
-        if (presentation && currentSlide < presentation.slides.length - 1)
-          showSlide(currentSlide + 1);
+        if (presentation && currentSlide < presentation.slides.length - 1) {
+          showSlide(currentSlide + 1).catch((e) => {
+            statusEl.textContent = `Error: ${e.message || e}`;
+            console.error(e);
+          });
+        }
       });
 
       document.addEventListener('keydown', (e) => {

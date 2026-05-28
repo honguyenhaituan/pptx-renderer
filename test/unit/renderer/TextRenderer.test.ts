@@ -173,6 +173,40 @@ describe('TextRenderer — renderTextBody', () => {
       expect(span!.style.fontSize).toBe('24pt');
     });
 
+    it('applies effective run font size to the paragraph line box (xcloud-intro slide 12 mini map)', () => {
+      const body = makeTextBody({
+        paragraphs: [
+          {
+            runs: [
+              {
+                text: 'Multi-Cloud Mgmt.',
+                properties: xmlNode('<rPr sz="400"/>'),
+              },
+            ],
+            level: 0,
+          },
+          {
+            runs: [
+              {
+                text: '& FinOps',
+                properties: xmlNode('<rPr sz="400"/>'),
+              },
+            ],
+            level: 0,
+          },
+        ],
+      });
+
+      const container = renderToContainer(body);
+      const paragraphs = [...container.children] as HTMLElement[];
+
+      expect(paragraphs.map((paragraph) => paragraph.style.fontSize)).toEqual(['4pt', '4pt']);
+      expect([...container.querySelectorAll('span')].map((span) => span.style.fontSize)).toEqual([
+        '4pt',
+        '4pt',
+      ]);
+    });
+
     it('preserves inherited defRPr font size when paragraph defRPr is empty (ai-computing slide 28)', () => {
       const ctx = createMockRenderContext();
       ctx.master.textStyles.otherStyle = parseXml(`

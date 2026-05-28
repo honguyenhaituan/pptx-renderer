@@ -2665,6 +2665,29 @@ describe('renderImage', () => {
       pdfSpy.mockRestore();
     });
 
+    it('tracks async EMF PDF rendering tasks so slide capture can await icons (xcloud-solution slide 13)', async () => {
+      const emfModule = await import('../../../src/utils/emfParser');
+      const pdfModule = await import('../../../src/utils/pdfRenderer');
+      const emfSpy = vi.spyOn(emfModule, 'parseEmfContent').mockReturnValue({
+        type: 'pdf',
+        data: new Uint8Array([0x25, 0x50, 0x44, 0x46]),
+      });
+      const pdfSpy = vi.spyOn(pdfModule, 'renderPdfToImage').mockResolvedValue('blob:tracked-pdf-url');
+
+      const ctx = createEmfCtx() as RenderContext & { asyncTasks: Promise<void>[] };
+      ctx.asyncTasks = [];
+      const node = createPicNode({ blipEmbed: 'rId1' });
+      const el = renderImage(node, ctx);
+
+      expect(ctx.asyncTasks).toHaveLength(1);
+      await Promise.all(ctx.asyncTasks);
+
+      expect(el.querySelector('img')?.src).toContain('blob:tracked-pdf-url');
+
+      emfSpy.mockRestore();
+      pdfSpy.mockRestore();
+    });
+
     it('leaves wrapper empty when renderPdfToImage returns null', async () => {
       const emfModule = await import('../../../src/utils/emfParser');
       const pdfModule = await import('../../../src/utils/pdfRenderer');

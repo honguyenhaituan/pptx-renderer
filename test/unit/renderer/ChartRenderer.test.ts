@@ -311,6 +311,7 @@ describe('ChartRenderer', () => {
 
       const legend = option.legend as any;
       expect(legend?.right).toBeDefined();
+      expect(legend?.top).toBe('middle');
       expect(legend?.orient).toBe('vertical');
     });
 
@@ -1922,7 +1923,7 @@ describe('ChartRenderer', () => {
         }),
       );
       expect(grid?.left).toBe(24);
-      expect(grid?.top).toBe(64);
+      expect(grid?.top).toBe(52);
       expect(grid?.bottom).toBe(20);
       expect(xAxis?.max).toBe(3);
       expect(xAxis?.interval).toBe(1);
@@ -2767,6 +2768,37 @@ describe('ChartRenderer', () => {
       expect(legend.style.transform).toBe('translateX(-50%)');
       expect(labels.map((label) => label.textContent)).toEqual(['算力', '增速']);
       expect(labels.every((label) => label.style.fontSize === '9px')).toBe(true);
+    });
+
+    it('renders right legends vertically centered (oracle-full-chart-0001-clustered-bar)', () => {
+      const ctx = createMockRenderContext();
+      ctx.presentation.charts = new Map([
+        [
+          'ppt/charts/chart1.xml',
+          parseXml(buildChartSpaceXml({ hasLegend: true, legendPos: 'r', valAxDeleted: false })),
+        ],
+      ]);
+
+      const node: ChartNodeData = {
+        id: 'chart1',
+        name: 'Chart 1',
+        nodeType: 'chart',
+        chartPath: 'ppt/charts/chart1.xml',
+        position: { x: 0, y: 0 },
+        size: { w: 400, h: 300 },
+        rotation: 0,
+        flipH: false,
+        flipV: false,
+      };
+
+      const wrapper = renderChart(node, ctx);
+      const legend = wrapper.querySelector('.pptx-chart-custom-legend') as HTMLElement;
+
+      expect(legend).not.toBeNull();
+      expect(legend.style.flexDirection).toBe('column');
+      expect(legend.style.right).toBe('8px');
+      expect(legend.style.top).toBe('150px');
+      expect(legend.style.transform).toBe('translateY(-50%)');
     });
 
     it('renders radar legend overlay with line marker icons using chart-local theme colors', () => {

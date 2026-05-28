@@ -588,6 +588,10 @@ export function resolveLineStyle(
       width = idx * 0.75;
     }
   }
+  if (width === 0 && color !== 'transparent' && !ln.child('noFill').exists()) {
+    // OOXML defaults an explicit visible line with no `w` to 0.75pt, which is 1px at 96dpi.
+    width = 1;
+  }
 
   // Dash pattern
   let dash = 'solid';

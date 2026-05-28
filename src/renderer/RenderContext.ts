@@ -24,6 +24,8 @@ export interface RenderContext {
   masterPath?: string;
   mediaUrlCache: Map<string, string>; // path -> blob URL
   colorCache: Map<string, { color: string; alpha: number }>;
+  /** Async media/rendering work that callers may await before screenshot/export. */
+  asyncTasks?: Promise<void>[];
   /** Shared set of live ECharts instances for explicit disposal. */
   chartInstances?: Set<ECharts>;
   /** Fill node from parent group's grpSpPr, used to resolve `a:grpFill` in children. */

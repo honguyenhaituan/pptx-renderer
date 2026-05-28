@@ -26,6 +26,45 @@ function isSingleLineTextBody(textBody: TextBody): boolean {
   return visibleParagraphCount === 1;
 }
 
+function hasExplicitCenteredParagraph(textBody: TextBody): boolean {
+  const visibleParagraphs = textBody.paragraphs.filter((p) =>
+    p.runs.some((r) => r.text != null && r.text.length > 0),
+  );
+  if (visibleParagraphs.length === 0) return false;
+  return visibleParagraphs.every((p) => p.properties?.attr('algn') === 'ctr');
+}
+
+function paragraphHasBullet(
+  textBody: TextBody,
+  paragraph: TextBody['paragraphs'][number],
+): boolean {
+  const candidates = [
+    paragraph.properties,
+    textBody.listStyle?.child(`lvl${paragraph.level + 1}pPr`),
+    textBody.listStyle?.child('defPPr'),
+  ];
+
+  for (const pPr of candidates) {
+    if (!pPr?.exists()) continue;
+    if (pPr.child('buNone').exists()) return false;
+    if (
+      pPr.child('buChar').exists() ||
+      pPr.child('buAutoNum').exists() ||
+      pPr.child('buBlip').exists()
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function hasBulletParagraph(textBody: TextBody): boolean {
+  return textBody.paragraphs.some(
+    (p) =>
+      p.runs.some((r) => r.text != null && r.text.length > 0) && paragraphHasBullet(textBody, p),
+  );
+}
+
 function isTitlePlaceholder(placeholder: ShapeNodeData['placeholder']): boolean {
   return placeholder?.type === 'title' || placeholder?.type === 'ctrTitle';
 }
@@ -192,6 +231,43 @@ function resolveShapeBlipUrl(blipFill: SafeXmlNode, ctx: RenderContext): string 
 
 let markerIdCounter = 0;
 let gradientIdCounter = 0;
+
+function applySvgDropShadowFilter(
+  svgNs: string,
+  defs: SVGDefsElement,
+  target: SVGElement,
+  bounds: { w: number; h: number },
+  shadow: {
+    dx: number;
+    dy: number;
+    blur: number;
+    color: { r: number; g: number; b: number };
+    opacity: number;
+  },
+): void {
+  const filterId = `shape-shadow-${++gradientIdCounter}`;
+  const filter = document.createElementNS(svgNs, 'filter');
+  const margin = Math.max(Math.abs(shadow.dx), Math.abs(shadow.dy)) + shadow.blur * 4 + 4;
+  filter.setAttribute('id', filterId);
+  filter.setAttribute('filterUnits', 'userSpaceOnUse');
+  filter.setAttribute('x', String(-margin));
+  filter.setAttribute('y', String(-margin));
+  filter.setAttribute('width', String(bounds.w + margin * 2));
+  filter.setAttribute('height', String(bounds.h + margin * 2));
+
+  const dropShadow = document.createElementNS(svgNs, 'feDropShadow');
+  dropShadow.setAttribute('dx', shadow.dx.toFixed(1));
+  dropShadow.setAttribute('dy', shadow.dy.toFixed(1));
+  dropShadow.setAttribute('stdDeviation', Math.max(0, shadow.blur / 2).toFixed(2));
+  dropShadow.setAttribute(
+    'flood-color',
+    `rgb(${shadow.color.r},${shadow.color.g},${shadow.color.b})`,
+  );
+  dropShadow.setAttribute('flood-opacity', shadow.opacity.toFixed(4));
+  filter.appendChild(dropShadow);
+  defs.appendChild(filter);
+  target.setAttribute('filter', `url(#${filterId})`);
+}
 
 function svgDashArrayForKind(dashKind: string, strokeWidth: number): string | null {
   const w = Math.max(strokeWidth, 1);
@@ -641,6 +717,10 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
   }
 
   // ---- Create SVG element ----
+  let mainSvgNs: string | null = null;
+  let mainDefs: SVGDefsElement | null = null;
+  let mainPath: SVGPathElement | null = null;
+  let mainSvgBounds: { w: number; h: number } | null = null;
   if (pathD) {
     const svgNs = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(svgNs, 'svg');
@@ -685,6 +765,10 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
 
       const path = document.createElementNS(svgNs, 'path');
       path.setAttribute('d', pathD);
+      mainSvgNs = svgNs;
+      mainDefs = defs;
+      mainPath = path;
+      mainSvgBounds = { w: svgW, h: svgH };
       const presetLower = node.presetGeometry?.toLowerCase();
       if (presetLower === 'curveduparrow' || presetLower === 'curveddownarrow') {
         // Curved arrows can contain overlapping sub-contours near arrowhead roots.
@@ -1355,7 +1439,11 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
       const spAutoFitAllowsVerticalOverflow =
         hasSpAutoFit && !hasNormAutofit && vertOverflow === 'overflow';
       const usesImplicitSingleLineFit =
-        !hasSpAutoFit && !hasNormAutofit && !hasNoAutofit && isSingleLineTextBody(node.textBody);
+        !hasSpAutoFit &&
+        !hasNormAutofit &&
+        !hasNoAutofit &&
+        isSingleLineTextBody(node.textBody) &&
+        !hasBulletParagraph(node.textBody);
       const usesNoAutofitSingleLineTitleFit =
         hasNoAutofit && isTitlePlaceholder(node.placeholder) && isSingleLineTextBody(node.textBody);
       textContainer.style.overflowX = 'visible';
@@ -1441,6 +1529,8 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
           textContainer.style.justifyContent = 'center';
         } else if (anchor === 'b') {
           textContainer.style.justifyContent = 'flex-end';
+        } else {
+          textContainer.style.justifyContent = 'flex-start';
         }
 
         // Internal margins (insets): prefer shape's own, then layout, then OOXML defaults
@@ -1483,7 +1573,12 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
           isVerticalText = true;
         }
 
-        if (isSingleLineSpAutoFit && !hasExplicitTextAnchor && !isVerticalText) {
+        if (
+          isSingleLineSpAutoFit &&
+          !hasExplicitTextAnchor &&
+          !isVerticalText &&
+          hasExplicitCenteredParagraph(node.textBody)
+        ) {
           textContainer.style.justifyContent = 'center';
         }
       }
@@ -1682,10 +1777,12 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
 
       // Resolve shadow color
       let shadowColor = 'rgba(0,0,0,0.4)';
+      let shadowRgb = { r: 0, g: 0, b: 0 };
       const { color: shdColor, alpha: shdAlpha } = resolveColor(outerShdw, ctx);
       if (shdColor) {
         const hex = shdColor.startsWith('#') ? shdColor : `#${shdColor}`;
         const { r: sr, g: sg, b: sb } = hexToRgb(hex);
+        shadowRgb = { r: sr, g: sg, b: sb };
         shadowColor = `rgba(${sr},${sg},${sb},${shdAlpha.toFixed(3)})`;
       }
 
@@ -1740,16 +1837,27 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
 
         // Skip shadow entirely if effective alpha is negligible
         if (effectiveAlpha >= 0.01) {
-          const bsX = (offsetX + alignOffX).toFixed(1);
-          const bsY = (offsetY + alignOffY).toFixed(1);
+          const bsX = offsetX + alignOffX;
+          const bsY = offsetY + alignOffY;
           // Recompute shadow color with attenuated alpha
           let attenuatedColor = shadowColor;
           if (shdColor) {
             const hex2 = shdColor.startsWith('#') ? shdColor : `#${shdColor}`;
             const { r: sr2, g: sg2, b: sb2 } = hexToRgb(hex2);
+            shadowRgb = { r: sr2, g: sg2, b: sb2 };
             attenuatedColor = `rgba(${sr2},${sg2},${sb2},${effectiveAlpha.toFixed(4)})`;
           }
-          wrapper.style.boxShadow = `${bsX}px ${bsY}px ${effectiveBlur.toFixed(1)}px ${spread.toFixed(1)}px ${attenuatedColor}`;
+          if (!isLineLike && mainSvgNs && mainDefs && mainPath && mainSvgBounds) {
+            applySvgDropShadowFilter(mainSvgNs, mainDefs, mainPath, mainSvgBounds, {
+              dx: bsX,
+              dy: bsY,
+              blur: effectiveBlur,
+              color: shadowRgb,
+              opacity: effectiveAlpha,
+            });
+          } else {
+            wrapper.style.boxShadow = `${bsX.toFixed(1)}px ${bsY.toFixed(1)}px ${effectiveBlur.toFixed(1)}px ${spread.toFixed(1)}px ${attenuatedColor}`;
+          }
         }
       } else {
         wrapper.style.filter = `drop-shadow(${offsetX.toFixed(1)}px ${offsetY.toFixed(1)}px ${blurPx.toFixed(1)}px ${shadowColor})`;

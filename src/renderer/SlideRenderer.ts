@@ -48,6 +48,8 @@ export interface SlideRendererOptions {
 export interface SlideHandle {
   /** The rendered slide DOM element. */
   readonly element: HTMLElement;
+  /** Resolves when asynchronous slide resources (for example EMF-PDF fallbacks) finish. */
+  readonly ready: Promise<void>;
   /** Dispose slide-specific resources (charts inside this slide, blob URLs if standalone). */
   dispose(): void;
   /** Support `using` declarations (TC39 Explicit Resource Management). */
@@ -211,9 +213,11 @@ export function renderSlide(
 ): SlideHandle {
   const isSharedCache = !!options?.mediaUrlCache;
   const chartInstances = options?.chartInstances ?? new Set<ECharts>();
+  const asyncTasks: Promise<void>[] = [];
 
   // Create render context (resolves slide -> layout -> master -> theme chain)
   const ctx = createRenderContext(presentation, slide, options?.mediaUrlCache, chartInstances);
+  ctx.asyncTasks = asyncTasks;
   if (options?.onNavigate) {
     ctx.onNavigate = options.onNavigate;
   }
@@ -296,6 +300,7 @@ export function renderSlide(
   // Build SlideHandle
   let disposed = false;
   const mediaUrlCache = ctx.mediaUrlCache;
+  const ready = Promise.allSettled(asyncTasks).then(() => undefined);
 
   const dispose = (): void => {
     if (disposed) return;
@@ -322,6 +327,7 @@ export function renderSlide(
 
   return {
     element: container,
+    ready,
     dispose,
     [Symbol.dispose](): void {
       dispose();

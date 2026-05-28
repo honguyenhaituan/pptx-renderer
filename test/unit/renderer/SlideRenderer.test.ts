@@ -94,6 +94,23 @@ describe('renderSlide', () => {
     expect(el.style.overflow).toBe('hidden');
   });
 
+  it('exposes a ready promise for async slide resources such as EMF icons', async () => {
+    const pres = makeMinimalPres();
+    const slide: SlideData = {
+      index: 0,
+      nodes: [],
+      rels: new Map(),
+      showMasterSp: true,
+    };
+
+    const handle = renderSlide(pres, slide) as ReturnType<typeof renderSlide> & {
+      ready?: Promise<void>;
+    };
+
+    expect(handle.ready).toBeInstanceOf(Promise);
+    await expect(handle.ready).resolves.toBeUndefined();
+  });
+
   it('renders shape nodes', () => {
     const pres = makeMinimalPres();
     const slide: SlideData = {

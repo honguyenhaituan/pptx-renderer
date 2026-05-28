@@ -1011,6 +1011,7 @@ function getChartThemeFontFamily(ctx: RenderContext): string | undefined {
 /** Parsed legend info including overlay flag. */
 interface LegendInfo {
   option: echarts.EChartsOption['legend'];
+  position: 'b' | 't' | 'l' | 'r' | 'tr';
   overlay: boolean; // true = legend overlaps plot area (don't reserve grid space)
   textStyle?: ChartTextStyle & {
     fontWeight?: 'normal' | 'bold' | 'bolder' | 'lighter' | number;
@@ -1027,7 +1028,10 @@ function extractLegendInfo(chartNode: SafeXmlNode, ctx: RenderContext): LegendIn
 
   const legendPos = legend.child('legendPos');
   // OOXML default legend position is 'r' (right) per the spec, not 'b'
-  const posVal = legendPos.exists() ? legendPos.attr('val') || 'r' : 'r';
+  const rawPosVal = legendPos.exists() ? legendPos.attr('val') || 'r' : 'r';
+  const posVal = ['b', 't', 'l', 'r', 'tr'].includes(rawPosVal)
+    ? (rawPosVal as LegendInfo['position'])
+    : 'r';
 
   const overlay = legend.child('overlay').attr('val') === '1';
 
@@ -1043,20 +1047,21 @@ function extractLegendInfo(chartNode: SafeXmlNode, ctx: RenderContext): LegendIn
       option = { ...base, top: topBelowTitle, orient: 'horizontal' as const };
       break;
     case 'l':
-      option = { ...base, left: '2%', top: '44%', orient: 'vertical' as const };
+      option = { ...base, left: '2%', top: 'middle', orient: 'vertical' as const };
       break;
     case 'r':
-      option = { ...base, right: '2%', top: '44%', orient: 'vertical' as const };
+      option = { ...base, right: '2%', top: 'middle', orient: 'vertical' as const };
       break;
     case 'tr':
       option = { ...base, top: topBelowTitle, right: '2%', orient: 'vertical' as const };
       break;
     default:
-      option = { ...base, right: '2%', top: '44%', orient: 'vertical' as const };
+      option = { ...base, right: '2%', top: 'middle', orient: 'vertical' as const };
       break;
   }
   return {
     option,
+    position: posVal,
     overlay,
     textStyle: (() => {
       const s = extractTxPrStyle(legend, ctx);
@@ -1098,10 +1103,7 @@ function extractLegendManualLayout(
 
 /** True when legend is positioned at top (t or tr), so plot area should reserve more top space. */
 function legendIsAtTop(legendInfo: LegendInfo | undefined): boolean {
-  if (!legendInfo || !legendInfo.option || typeof legendInfo.option !== 'object') return false;
-  const o = legendInfo.option as Record<string, unknown>;
-  // top: 'middle' is used by right/left legends (vertically centered), not "at top"
-  return o.top !== undefined && o.top !== null && o.top !== 'middle';
+  return legendInfo?.position === 't' || legendInfo?.position === 'tr';
 }
 
 /**
@@ -3806,7 +3808,12 @@ function buildCustomLegendOverlay(
   const sideLegend =
     legend.orient === 'vertical' && (legend.left !== undefined || legend.right !== undefined);
   if (sideLegend) {
-    if (legend.top === undefined && legend.bottom === undefined) {
+    if (legend.top === 'middle') {
+      overlay.style.top = `${size.h / 2}px`;
+      overlay.style.transform = 'translateY(-50%)';
+    } else if (legend.top !== undefined) {
+      overlay.style.top = resolveInsetToPx(legend.top, size.h);
+    } else if (legend.bottom === undefined) {
       overlay.style.top = `${size.h / 2}px`;
       overlay.style.transform = 'translateY(-50%)';
     }
