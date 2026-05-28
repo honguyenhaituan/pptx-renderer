@@ -222,6 +222,45 @@ describe('TextRenderer — renderTextBody', () => {
       expect(span!.style.color).not.toBe('');
     });
 
+    it('lets explicit run solidFill override inherited gradient text fill (xcloud-intro slide 2)', () => {
+      const body = makeTextBody({
+        listStyle: `
+          <lstStyle xmlns="http://schemas.openxmlformats.org/drawingml/2006/main">
+            <lvl1pPr>
+              <defRPr sz="3200">
+                <gradFill>
+                  <gsLst>
+                    <gs pos="0"><srgbClr val="FFFFFF"/></gs>
+                    <gs pos="100000"><srgbClr val="FFC000"/></gs>
+                  </gsLst>
+                  <lin ang="2700000" scaled="0"/>
+                </gradFill>
+              </defRPr>
+            </lvl1pPr>
+          </lstStyle>
+        `,
+        paragraphs: [
+          {
+            properties: xmlNode('<pPr><defRPr/></pPr>'),
+            runs: [
+              {
+                text: 'Lenovo AI Cloud',
+                properties: xmlNode(
+                  '<rPr><solidFill><srgbClr val="FFFFFF"/></solidFill></rPr>',
+                ),
+              },
+            ],
+            level: 0,
+          },
+        ],
+      });
+      const container = renderToContainer(body);
+      const span = container.querySelector('span') as HTMLElement;
+
+      expect(span.style.color).toBe('rgb(255, 255, 255)');
+      expect(span.style.background).toBe('');
+    });
+
     it('applies letter spacing from rPr spc', () => {
       const body = makeTextBody({
         paragraphs: [
@@ -405,6 +444,34 @@ describe('TextRenderer — renderTextBody', () => {
 
       expect(bulletSpan).toBeDefined();
       expect(bulletSpan!.style.fontSize).toBe('30pt');
+    });
+
+    it('uses hanging indent as a fixed bullet gutter for wrapped bullet text', () => {
+      const body = makeTextBody({
+        paragraphs: [
+          {
+            properties: xmlNode('<pPr marL="171450" indent="-171450"><buChar char="•"/></pPr>'),
+            runs: [{ text: 'NV GPU卡&国产异构GPU卡统一调度' }],
+            level: 0,
+          },
+        ],
+      });
+      const container = renderToContainer(body);
+      const para = container.children[0] as HTMLElement;
+      const bulletSpan = Array.from(para.querySelectorAll('span')).find((span) =>
+        span.textContent?.includes('•'),
+      ) as HTMLElement | undefined;
+
+      expect(parseFloat(para.style.paddingLeft)).toBeGreaterThan(0);
+      expect(para.style.textIndent).toBe('0px');
+      expect(para.style.position).toBe('relative');
+      expect(bulletSpan).toBeDefined();
+      expect(bulletSpan!.style.position).toBe('absolute');
+      expect(bulletSpan!.style.left).toBe('0px');
+      expect(parseFloat(bulletSpan!.style.width)).toBeCloseTo(
+        parseFloat(para.style.paddingLeft),
+        1,
+      );
     });
 
     it('applies absolute bullet size from buSzPts', () => {
@@ -835,6 +902,75 @@ describe('TextRenderer — renderTextBody', () => {
       const container = renderToContainer(body);
       const span = container.querySelector('span');
       expect(span!.style.fontFamily).toContain('Arial');
+    });
+
+    it('keeps East Asian font fallback when latin and ea typefaces are both declared (ai-computing slide 40 titles)', () => {
+      const body = makeTextBody({
+        paragraphs: [
+          {
+            runs: [
+              {
+                text: '项目背景',
+                properties: xmlNode(
+                  '<rPr><latin typeface="Arial"/><ea typeface="微软雅黑"/></rPr>',
+                ),
+              },
+            ],
+            level: 0,
+          },
+        ],
+      });
+      const container = renderToContainer(body);
+      const span = container.querySelector('span');
+
+      expect(span!.style.fontFamily).toContain('Arial');
+      expect(span!.style.fontFamily).toContain('微软雅黑');
+      expect(span!.style.fontFamily).toContain('PingFang SC');
+    });
+
+    it('adds CJK sans fallbacks for Microsoft YaHei to avoid serif fallback (ai-computing slide 20)', () => {
+      const body = makeTextBody({
+        paragraphs: [
+          {
+            runs: [
+              {
+                text: 'DRF（Dominant Resource Fairness）是主资源公平调度策略',
+                properties: xmlNode('<rPr><latin typeface="微软雅黑"/></rPr>'),
+              },
+            ],
+            level: 0,
+          },
+        ],
+      });
+      const container = renderToContainer(body);
+      const span = container.querySelector('span');
+
+      expect(span!.style.fontFamily).toContain('微软雅黑');
+      expect(span!.style.fontFamily).toContain('PingFang SC');
+      expect(span!.style.fontFamily).toContain('sans-serif');
+    });
+
+    it('adds sans-serif fallbacks for Calibri when the Office font is unavailable (xcloud-intro slide 8)', () => {
+      const body = makeTextBody({
+        paragraphs: [
+          {
+            runs: [
+              {
+                text: 'Solution Architecture',
+                properties: xmlNode('<rPr><latin typeface="Calibri"/></rPr>'),
+              },
+            ],
+            level: 0,
+          },
+        ],
+      });
+      const container = renderToContainer(body);
+      const span = container.querySelector('span');
+
+      expect(span!.style.fontFamily).toContain('Calibri');
+      expect(span!.style.fontFamily).toContain('Arial');
+      expect(span!.style.fontFamily).toContain('sans-serif');
+      expect(span!.style.fontFamily).not.toContain('PingFang SC');
     });
 
     it('falls back to theme minor font when no font specified', () => {

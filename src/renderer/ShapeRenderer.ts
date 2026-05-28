@@ -64,6 +64,10 @@ function applyVerticalTextFlow(el: HTMLElement, anchor: string | null | undefine
 }
 
 const WRAPPED_AUTOFIT_HEIGHT_TOLERANCE = 1.1;
+// Single-paragraph CJK spAutoFit boxes are especially sensitive to browser font
+// metric overhang; allow a larger margin without applying one-line shrink.
+const SINGLE_PARAGRAPH_WRAPPED_AUTOFIT_HEIGHT_TOLERANCE = 1.25;
+const WRAPPED_AUTOFIT_WIDTH_TOLERANCE_PX = 1;
 
 function getSupportedTextWarpPreset(textBody: TextBody): 'textArchDown' | 'textArchUp' | null {
   const prstTxWarp = textBody.bodyProperties?.child('prstTxWarp');
@@ -934,19 +938,27 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
         );
         linearGrad.setAttribute('gradientUnits', 'userSpaceOnUse');
 
-        // Convert gradient angle to absolute coordinates in SVG user space
-        const rad = (gradientStroke.angle * Math.PI) / 180;
-        const cos = Math.cos(rad);
-        const sin = Math.sin(rad);
-        // Centre of the SVG viewBox
-        const cx = svgW / 2;
-        const cy = svgH / 2;
-        // Half-extent along each axis (use max of both dimensions so the gradient covers the path)
-        const halfLen = Math.max(svgW, svgH) / 2;
-        linearGrad.setAttribute('x1', String(cx - halfLen * cos));
-        linearGrad.setAttribute('y1', String(cy - halfLen * sin));
-        linearGrad.setAttribute('x2', String(cx + halfLen * cos));
-        linearGrad.setAttribute('y2', String(cy + halfLen * sin));
+        if (isLineLike || svgW <= 1 || svgH <= 1) {
+          // Convert gradient angle to absolute coordinates in SVG user space.
+          // For straight connectors the path bbox may be zero on one axis, so use
+          // the long-axis strategy to avoid degenerate gradient coordinates.
+          const rad = (gradientStroke.angle * Math.PI) / 180;
+          const cos = Math.cos(rad);
+          const sin = Math.sin(rad);
+          const cx = svgW / 2;
+          const cy = svgH / 2;
+          const halfLen = Math.max(svgW, svgH) / 2;
+          linearGrad.setAttribute('x1', String(cx - halfLen * cos));
+          linearGrad.setAttribute('y1', String(cy - halfLen * sin));
+          linearGrad.setAttribute('x2', String(cx + halfLen * cos));
+          linearGrad.setAttribute('y2', String(cy + halfLen * sin));
+        } else {
+          const coords = angleToSvgGradientCoords(gradientStroke.angle);
+          linearGrad.setAttribute('x1', String((parseFloat(coords.x1) / 100) * svgW));
+          linearGrad.setAttribute('y1', String((parseFloat(coords.y1) / 100) * svgH));
+          linearGrad.setAttribute('x2', String((parseFloat(coords.x2) / 100) * svgW));
+          linearGrad.setAttribute('y2', String((parseFloat(coords.y2) / 100) * svgH));
+        }
 
         for (const stop of gradientStroke.stops) {
           const svgStop = document.createElementNS(svgNs, 'stop');
@@ -1517,75 +1529,115 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
       // Dynamic normAutofit: when fontScale is not stored in the XML, measure the
       // rendered text and compute the needed scale so all text fits the container.
       if (needsDynamicAutofit) {
-        // The wrapper isn't in the DOM yet, so temporarily attach it offscreen to measure.
-        wrapper.style.visibility = 'hidden';
-        document.body.appendChild(wrapper);
-        // Temporarily neutralise vertical alignment so content overflows downward
-        // (flex-end would push content upward, making scrollHeight == clientHeight).
-        const savedJC = textContainer.style.justifyContent;
-        const savedWhiteSpace = textContainer.style.whiteSpace;
-        textContainer.style.justifyContent = 'flex-start';
-        const containerW = textContainer.clientWidth;
-        const containerH = textContainer.clientHeight;
-        const wrappedContentH = textContainer.scrollHeight;
-        const wrappedContentW = textContainer.scrollWidth;
-        let contentW = wrappedContentW;
-        let contentH = wrappedContentH;
-        const wrappedWidthFits = containerW > 0 && wrappedContentW <= containerW;
-        const wrappedHeightFits =
-          containerH > 0 &&
-          (wrappedContentH <= containerH ||
-            (wrappedWidthFits && wrappedContentH <= containerH * WRAPPED_AUTOFIT_HEIGHT_TOLERANCE));
-        const wrappedFits =
-          containerW > 0 && containerH > 0 && wrappedWidthFits && wrappedHeightFits;
-        const shouldMeasureUnwrappedWidth =
-          !isVerticalText &&
-          !spAutoFitAllowsHorizontalOverflow &&
-          !wrappedFits &&
-          (!wrappedWidthFits ||
-            isSingleLineSpAutoFit ||
-            usesImplicitSingleLineFit ||
-            usesNoAutofitSingleLineTitleFit);
-        if (shouldMeasureUnwrappedWidth) {
-          textContainer.style.whiteSpace = 'nowrap';
-          contentW = textContainer.scrollWidth;
-          contentH = textContainer.scrollHeight;
-          textContainer.style.whiteSpace = savedWhiteSpace;
-        }
-        textContainer.style.justifyContent = savedJC;
-        document.body.removeChild(wrapper);
-        wrapper.style.visibility = '';
-        let scale = 1;
-        const fitWidthOnly = usesNoAutofitSingleLineTitleFit;
-        if (!spAutoFitAllowsHorizontalOverflow && contentW > containerW && containerW > 0) {
-          scale = Math.min(scale, containerW / contentW);
-        }
-        if (
-          !fitWidthOnly &&
-          !spAutoFitAllowsVerticalOverflow &&
-          !wrappedHeightFits &&
-          contentH > containerH &&
-          containerH > 0
-        ) {
-          scale = Math.min(scale, containerH / contentH);
-        }
-        if (
-          !fitWidthOnly &&
-          !spAutoFitAllowsVerticalOverflow &&
-          scale === 1 &&
-          !wrappedHeightFits &&
-          wrappedContentH > containerH &&
-          containerH > 0
-        ) {
-          scale = containerH / wrappedContentH;
-        }
-        if (scale < 1) {
-          if (!textContainer.style.transform) {
-            textContainer.style.transformOrigin = 'top left';
+        const baseTransform = textContainer.style.transform;
+        const baseTransformOrigin = textContainer.style.transformOrigin;
+        const baseWidth = textContainer.style.width;
+        const baseHeight = textContainer.style.height;
+        const applyDynamicAutofit = () => {
+          textContainer.style.transform = baseTransform;
+          textContainer.style.transformOrigin = baseTransformOrigin;
+          textContainer.style.width = baseWidth;
+          textContainer.style.height = baseHeight;
+
+          // The wrapper is not always in the DOM yet, so temporarily attach it offscreen to measure.
+          const wasConnected = wrapper.isConnected;
+          const savedWrapperVisibility = wrapper.style.visibility;
+          if (!wasConnected) {
+            wrapper.style.visibility = 'hidden';
+            document.body.appendChild(wrapper);
           }
-          appendTransform(textContainer, `scale(${scale})`);
-          textContainer.style.width = `${100 / scale}%`;
-          textContainer.style.height = `${100 / scale}%`;
+
+          // Temporarily neutralise vertical alignment so content overflows downward
+          // (flex-end would push content upward, making scrollHeight == clientHeight).
+          const savedJC = textContainer.style.justifyContent;
+          const savedWhiteSpace = textContainer.style.whiteSpace;
+          textContainer.style.justifyContent = 'flex-start';
+          const containerW = textContainer.clientWidth;
+          const containerH = textContainer.clientHeight;
+          const wrappedContentH = textContainer.scrollHeight;
+          const wrappedContentW = textContainer.scrollWidth;
+          let contentW = wrappedContentW;
+          let contentH = wrappedContentH;
+          const wrappedWidthFits =
+            containerW > 0 && wrappedContentW <= containerW + WRAPPED_AUTOFIT_WIDTH_TOLERANCE_PX;
+          const wrappedHeightTolerance = isSingleLineSpAutoFit
+            ? SINGLE_PARAGRAPH_WRAPPED_AUTOFIT_HEIGHT_TOLERANCE
+            : WRAPPED_AUTOFIT_HEIGHT_TOLERANCE;
+          const wrappedHeightFits =
+            containerH > 0 &&
+            (wrappedContentH <= containerH ||
+              (wrappedWidthFits && wrappedContentH <= containerH * wrappedHeightTolerance));
+          const wrappedFits =
+            containerW > 0 && containerH > 0 && wrappedWidthFits && wrappedHeightFits;
+          const shouldMeasureUnwrappedWidth =
+            !isVerticalText &&
+            !spAutoFitAllowsHorizontalOverflow &&
+            !wrappedFits &&
+            (!wrappedWidthFits ||
+              isSingleLineSpAutoFit ||
+              usesImplicitSingleLineFit ||
+              usesNoAutofitSingleLineTitleFit);
+          if (shouldMeasureUnwrappedWidth) {
+            textContainer.style.whiteSpace = 'nowrap';
+            contentW = textContainer.scrollWidth;
+            contentH = textContainer.scrollHeight;
+            textContainer.style.whiteSpace = savedWhiteSpace;
+          }
+          textContainer.style.justifyContent = savedJC;
+          if (!wasConnected) {
+            document.body.removeChild(wrapper);
+            wrapper.style.visibility = savedWrapperVisibility;
+          }
+          let scale = 1;
+          const fitWidthOnly = usesNoAutofitSingleLineTitleFit;
+          if (
+            !spAutoFitAllowsHorizontalOverflow &&
+            contentW > containerW + WRAPPED_AUTOFIT_WIDTH_TOLERANCE_PX &&
+            containerW > 0
+          ) {
+            scale = Math.min(scale, containerW / contentW);
+          }
+          if (
+            !fitWidthOnly &&
+            !spAutoFitAllowsVerticalOverflow &&
+            !wrappedHeightFits &&
+            contentH > containerH &&
+            containerH > 0
+          ) {
+            scale = Math.min(scale, containerH / contentH);
+          }
+          if (
+            !fitWidthOnly &&
+            !spAutoFitAllowsVerticalOverflow &&
+            scale === 1 &&
+            !wrappedHeightFits &&
+            wrappedContentH > containerH &&
+            containerH > 0
+          ) {
+            scale = containerH / wrappedContentH;
+          }
+          if (scale < 1) {
+            if (!textContainer.style.transform) {
+              textContainer.style.transformOrigin = 'top left';
+            }
+            appendTransform(textContainer, `scale(${scale})`);
+            textContainer.style.width = `${100 / scale}%`;
+            textContainer.style.height = `${100 / scale}%`;
+          }
+        };
+
+        const scheduleDynamicAutofit = () => {
+          if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(() => requestAnimationFrame(applyDynamicAutofit));
+          } else {
+            setTimeout(applyDynamicAutofit, 0);
+          }
+        };
+
+        applyDynamicAutofit();
+        scheduleDynamicAutofit();
+        if (document.fonts?.ready) {
+          void document.fonts.ready.then(() => scheduleDynamicAutofit()).catch(() => undefined);
         }
       }
     }

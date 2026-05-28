@@ -57,6 +57,9 @@ interface AxisInfo {
   max?: number;
   hasMajorGridlines: boolean;
   orientation: string; // 'minMax' | 'maxMin'
+  title?: string;
+  titleStyle?: ChartTextStyle;
+  titleRotation?: number;
   labelColor?: string; // hex color from txPr for axis labels
   labelFontSize?: number; // px from txPr defRPr@sz
   lineColor?: string; // hex color from spPr > ln for axis line
@@ -89,6 +92,12 @@ type ChartTextStyle = {
   fontFamily?: string;
   [EXPLICIT_FONT_SIZE]?: true;
 };
+
+export interface ChartFrameStyle {
+  borderColor?: string;
+  borderWidth?: number;
+  borderStyle?: ChartLineType;
+}
 
 function markExplicitFontSize<T extends object>(style: T): T {
   (style as ChartTextStyle)[EXPLICIT_FONT_SIZE] = true;
@@ -846,6 +855,38 @@ function parseSeries(chartTypeNode: SafeXmlNode, ctx: RenderContext): SeriesData
 // Chart Title
 // ---------------------------------------------------------------------------
 
+function extractTitleText(title: SafeXmlNode): string | undefined {
+  const tx = title.child('tx');
+  if (!tx.exists()) return undefined;
+
+  // Try rich text: tx > rich > p > r > t
+  const rich = tx.child('rich');
+  if (rich.exists()) {
+    const parts: string[] = [];
+    for (const p of rich.children('p')) {
+      for (const r of p.children('r')) {
+        const t = r.child('t').text();
+        if (t) parts.push(t);
+      }
+      for (const fld of p.children('fld')) {
+        const t = fld.child('t').text();
+        if (t) parts.push(t);
+      }
+    }
+    if (parts.length > 0) return parts.join('');
+  }
+
+  // Try strRef
+  const strRef = tx.child('strRef');
+  if (strRef.exists()) {
+    const strCache = strRef.child('strCache');
+    const pts = strCache.children('pt');
+    if (pts.length > 0) return pts[0].child('v').text();
+  }
+
+  return undefined;
+}
+
 /**
  * Extract chart title from chartSpace > chart > title.
  * Returns undefined when autoTitleDeleted val="1" (title was intentionally removed).
@@ -868,31 +909,7 @@ function extractChartTitle(chartNode: SafeXmlNode, seriesArr?: SeriesData[]): st
     return undefined;
   }
 
-  const tx = title.child('tx');
-  if (!tx.exists()) return undefined;
-
-  // Try rich text: tx > rich > p > r > t
-  const rich = tx.child('rich');
-  if (rich.exists()) {
-    const parts: string[] = [];
-    for (const p of rich.children('p')) {
-      for (const r of p.children('r')) {
-        const t = r.child('t').text();
-        if (t) parts.push(t);
-      }
-    }
-    if (parts.length > 0) return parts.join('');
-  }
-
-  // Try strRef
-  const strRef = tx.child('strRef');
-  if (strRef.exists()) {
-    const strCache = strRef.child('strCache');
-    const pts = strCache.children('pt');
-    if (pts.length > 0) return pts[0].child('v').text();
-  }
-
-  return undefined;
+  return extractTitleText(title);
 }
 
 /**
@@ -909,6 +926,53 @@ function extractTitleManualLayout(chartNode: SafeXmlNode): Partial<Record<'left'
   return out;
 }
 
+function extractDefRPrStyle(defRPr: SafeXmlNode, ctx: RenderContext): ChartTextStyle | undefined {
+  if (!defRPr.exists()) return undefined;
+
+  const style: ChartTextStyle = {};
+  const fill = defRPr.child('solidFill');
+  if (fill.exists()) {
+    const c = resolveColorToHex(fill, ctx);
+    if (c) style.color = c;
+  }
+  const sz = defRPr.numAttr('sz');
+  if (sz !== undefined && sz > 0) {
+    // OOXML sz is 1/100 pt. Keep renderer's existing px-scale convention.
+    style.fontSize = Math.round(sz / 100);
+    style[EXPLICIT_FONT_SIZE] = true;
+  }
+  const b = defRPr.attr('b');
+  if (b === '1' || b === 'true') style.bold = true;
+  else if (b === '0' || b === 'false') style.bold = false;
+  const latinTypeface = defRPr.child('latin').attr('typeface');
+  const eaTypeface = defRPr.child('ea').attr('typeface');
+  const csTypeface = defRPr.child('cs').attr('typeface');
+  if (latinTypeface || eaTypeface || csTypeface) {
+    style.fontFamily = latinTypeface || eaTypeface || csTypeface;
+  }
+
+  return style.color ||
+    style.fontSize !== undefined ||
+    style.bold !== undefined ||
+    style.fontFamily !== undefined
+    ? style
+    : undefined;
+}
+
+function extractParagraphTextStyle(
+  parentNode: SafeXmlNode,
+  ctx: RenderContext,
+): ChartTextStyle | undefined {
+  for (const p of parentNode.children('p')) {
+    const pPr = p.child('pPr');
+    if (!pPr.exists()) continue;
+    const defRPr = pPr.child('defRPr');
+    const style = extractDefRPrStyle(defRPr, ctx);
+    if (style) return style;
+  }
+  return undefined;
+}
+
 /**
  * Extract text color/font size from a txPr node:
  * txPr > p > pPr > defRPr (solidFill + sz).
@@ -916,44 +980,13 @@ function extractTitleManualLayout(chartNode: SafeXmlNode): Partial<Record<'left'
 function extractTxPrStyle(parentNode: SafeXmlNode, ctx: RenderContext): ChartTextStyle | undefined {
   const txPr = parentNode.child('txPr');
   if (!txPr.exists()) return undefined;
+  return extractParagraphTextStyle(txPr, ctx);
+}
 
-  for (const p of txPr.children('p')) {
-    const pPr = p.child('pPr');
-    if (!pPr.exists()) continue;
-    const defRPr = pPr.child('defRPr');
-    if (!defRPr.exists()) continue;
-
-    const style: ChartTextStyle = {};
-    const fill = defRPr.child('solidFill');
-    if (fill.exists()) {
-      const c = resolveColorToHex(fill, ctx);
-      if (c) style.color = c;
-    }
-    const sz = defRPr.numAttr('sz');
-    if (sz !== undefined && sz > 0) {
-      // OOXML sz is 1/100 pt. Keep renderer's existing px-scale convention.
-      style.fontSize = Math.round(sz / 100);
-      style[EXPLICIT_FONT_SIZE] = true;
-    }
-    const b = defRPr.attr('b');
-    if (b === '1' || b === 'true') style.bold = true;
-    else if (b === '0' || b === 'false') style.bold = false;
-    const latinTypeface = defRPr.child('latin').attr('typeface');
-    const eaTypeface = defRPr.child('ea').attr('typeface');
-    const csTypeface = defRPr.child('cs').attr('typeface');
-    if (latinTypeface || eaTypeface || csTypeface) {
-      style.fontFamily = latinTypeface || eaTypeface || csTypeface;
-    }
-
-    if (
-      style.color ||
-      style.fontSize !== undefined ||
-      style.bold !== undefined ||
-      style.fontFamily !== undefined
-    )
-      return style;
-  }
-  return undefined;
+function extractTitleTextStyle(title: SafeXmlNode, ctx: RenderContext): ChartTextStyle | undefined {
+  return (
+    extractTxPrStyle(title, ctx) ?? extractParagraphTextStyle(title.child('tx').child('rich'), ctx)
+  );
 }
 
 function getChartThemeFontFamily(ctx: RenderContext): string | undefined {
@@ -1367,6 +1400,33 @@ function extractMajorGridlineStyle(
   return extractChartLineStyle(ln, ctx);
 }
 
+function extractTitleRotation(title: SafeXmlNode): number | undefined {
+  const bodyPr = title.child('tx').child('rich').child('bodyPr').exists()
+    ? title.child('tx').child('rich').child('bodyPr')
+    : title.child('txPr').child('bodyPr');
+  const rot = bodyPr.numAttr('rot');
+  if (rot === undefined) return undefined;
+  const deg = rot / 60000;
+  return Number(deg.toFixed(3));
+}
+
+function extractAxisTitle(
+  ax: SafeXmlNode,
+  ctx: RenderContext,
+): Pick<AxisInfo, 'title' | 'titleStyle' | 'titleRotation'> {
+  const title = ax.child('title');
+  if (!title.exists()) return {};
+
+  const text = extractTitleText(title);
+  if (!text) return {};
+
+  return {
+    title: text,
+    titleStyle: extractTitleTextStyle(title, ctx),
+    titleRotation: extractTitleRotation(title),
+  };
+}
+
 /**
  * Parse a single axis node (c:valAx, c:catAx, or c:dateAx) into AxisInfo.
  */
@@ -1388,6 +1448,7 @@ function parseAxisNode(ax: SafeXmlNode, ctx: RenderContext): AxisInfo {
   const labelFontSize = txStyle?.fontSize;
   const lineColor = extractAxisLineColor(ax, ctx);
   const majorGridlineStyle = hasMajorGridlines ? extractMajorGridlineStyle(ax, ctx) : undefined;
+  const axisTitle = extractAxisTitle(ax, ctx);
   return {
     deleted,
     tickLblPos,
@@ -1396,6 +1457,7 @@ function parseAxisNode(ax: SafeXmlNode, ctx: RenderContext): AxisInfo {
     max: max !== undefined && !isNaN(max) ? max : undefined,
     hasMajorGridlines,
     orientation,
+    ...axisTitle,
     labelColor,
     labelFontSize,
     lineColor,
@@ -1497,6 +1559,26 @@ function applyAxisInfo(
 
   if (info.orientation === 'maxMin') {
     axisDef.inverse = true;
+  }
+
+  if (info.title) {
+    axisDef.name = info.title;
+    axisDef.nameLocation = 'middle';
+    axisDef.nameGap = kind === 'value' ? 42 : 28;
+    if (info.titleRotation !== undefined) {
+      axisDef.nameRotate = info.titleRotation;
+    }
+
+    const nameTextStyle: Record<string, unknown> = {};
+    if (info.titleStyle?.color) nameTextStyle.color = info.titleStyle.color;
+    if (info.titleStyle?.fontSize !== undefined) nameTextStyle.fontSize = info.titleStyle.fontSize;
+    if (info.titleStyle?.fontFamily) nameTextStyle.fontFamily = info.titleStyle.fontFamily;
+    if (info.titleStyle?.bold !== undefined) {
+      nameTextStyle.fontWeight = info.titleStyle.bold ? 'bold' : 'normal';
+    }
+    if (Object.keys(nameTextStyle).length > 0) {
+      axisDef.nameTextStyle = nameTextStyle;
+    }
   }
 
   // tickLblPos=none: hide labels only, keep axis line/tick
@@ -3049,6 +3131,20 @@ function extractBackgroundColors(
   return { chartBg, plotAreaBg };
 }
 
+function extractChartFrameStyle(
+  chartXml: SafeXmlNode,
+  ctx: RenderContext,
+): ChartFrameStyle | undefined {
+  const lineStyle = extractChartLineStyle(chartXml.child('spPr').child('ln'), ctx);
+  if (!lineStyle) return undefined;
+
+  return {
+    borderColor: lineStyle.color,
+    borderWidth: lineStyle.width,
+    borderStyle: lineStyle.type,
+  };
+}
+
 /**
  * Parse chartSpace-level clrMapOvr attributes into a color-map override.
  * Example: <c:clrMapOvr bg1="lt1" tx1="dk1" .../>
@@ -3785,6 +3881,7 @@ function extractManualLayoutGrid(
 export interface ParseChartResult {
   option: echarts.EChartsOption;
   dataTable?: DataTableInfo;
+  chartFrameStyle?: ChartFrameStyle;
 }
 
 function buildOptionForChartType(
@@ -3931,11 +4028,15 @@ export function parseChartXml(
   const plotArea = chart.child('plotArea');
 
   if (!plotArea.exists()) {
-    return { option: { title: { text: 'Unsupported chart', left: 'center' } } };
+    return {
+      option: { title: { text: 'Unsupported chart', left: 'center' } },
+      chartFrameStyle: extractChartFrameStyle(chartXml, chartCtx),
+    };
   }
 
   // Extract background colors
   const { chartBg, plotAreaBg } = extractBackgroundColors(chartXml, chart, chartCtx);
+  const chartFrameStyle = extractChartFrameStyle(chartXml, chartCtx);
 
   const chartTypeEntries = CHART_TYPE_ELEMENTS.map((typeName) => {
     const chartTypeNode = plotArea.child(typeName);
@@ -4029,13 +4130,14 @@ export function parseChartXml(
         }
       : undefined;
 
-    return { option, dataTable };
+    return { option, dataTable, chartFrameStyle };
   }
 
   return {
     option: {
       title: { text: 'Unsupported chart type', left: 'center', textStyle: { fontSize: 12 } },
     },
+    chartFrameStyle,
   };
 }
 
@@ -4081,7 +4183,13 @@ export function renderChart(node: ChartNodeData, ctx: RenderContext): HTMLElemen
   // Parse chart data and create ECharts option
   const chartTheme = ctx.presentation.chartThemes?.get(node.chartPath);
   const chartCtx = chartTheme ? { ...ctx, theme: chartTheme, colorCache: new Map() } : ctx;
-  const { option, dataTable } = parseChartXml(chartXml, chartCtx, node.chartPath);
+  const { option, dataTable, chartFrameStyle } = parseChartXml(chartXml, chartCtx, node.chartPath);
+  if (chartFrameStyle) {
+    wrapper.style.boxSizing = 'border-box';
+    if (chartFrameStyle.borderColor && chartFrameStyle.borderWidth && chartFrameStyle.borderStyle) {
+      wrapper.style.border = `${chartFrameStyle.borderWidth}px ${chartFrameStyle.borderStyle} ${chartFrameStyle.borderColor}`;
+    }
+  }
   const customLegend = buildCustomLegendOverlay(option, node.size);
   const legendOption = getLegendOptionObject(option.legend);
   if (customLegend && legendOption) {

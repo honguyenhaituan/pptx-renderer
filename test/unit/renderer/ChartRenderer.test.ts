@@ -41,6 +41,8 @@ function buildChartSpaceXml(opts: {
   chartClrMapOvrAttrs?: string;
   /** Optional chart style id (`<c:style val="..."/>`) */
   chartStyleVal?: number;
+  /** Optional chartSpace spPr XML fragment. Defaults to noFill. */
+  chartSpaceSpPr?: string;
   /** Series fill XML fragment (inside c:spPr). Defaults to solidFill red. */
   seriesFill?: string;
   /** Category axis txPr XML fragment. If provided, inserted inside catAx. */
@@ -59,6 +61,9 @@ function buildChartSpaceXml(opts: {
   values?: number[];
   /** Value axis deleted flag */
   valAxDeleted?: boolean;
+  /** Optional value axis title text and txPr style. */
+  valAxTitleText?: string;
+  valAxTitleTxPr?: string;
   /** Optional manual layout for plotArea; values are OOXML normalized fractions. */
   plotAreaManualLayout?: { x?: number; y?: number; w?: number; h?: number };
   /** Optional chart title text and txPr style. */
@@ -74,6 +79,7 @@ function buildChartSpaceXml(opts: {
     legendManualLayout,
     chartClrMapOvrAttrs,
     chartStyleVal,
+    chartSpaceSpPr,
     seriesFill = '<a:solidFill><a:srgbClr val="FF0000"/></a:solidFill>',
     catAxTxPr,
     catAxSpPr,
@@ -83,6 +89,8 @@ function buildChartSpaceXml(opts: {
     categories = ['2024', '2025E', '2026E'],
     values = [607, 710, 866],
     valAxDeleted = true,
+    valAxTitleText,
+    valAxTitleTxPr,
     plotAreaManualLayout,
     titleText,
     titleTxPr,
@@ -121,6 +129,7 @@ function buildChartSpaceXml(opts: {
   const catAxSpPrXml = catAxSpPr ? `<c:spPr>${catAxSpPr}</c:spPr>` : '';
   const chartClrMapOvrXml = chartClrMapOvrAttrs ? `<c:clrMapOvr ${chartClrMapOvrAttrs}/>` : '';
   const chartStyleXml = chartStyleVal !== undefined ? `<c:style val="${chartStyleVal}"/>` : '';
+  const chartSpaceSpPrXml = `<c:spPr>${chartSpaceSpPr ?? '<a:noFill/>'}</c:spPr>`;
   const plotAreaManualLayoutXml = plotAreaManualLayout
     ? `<c:layout><c:manualLayout>${
         plotAreaManualLayout.x !== undefined ? `<c:x val="${plotAreaManualLayout.x}"/>` : ''
@@ -140,6 +149,10 @@ function buildChartSpaceXml(opts: {
     : '';
   const titleXml = titleText
     ? `<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>${titleText}</a:t></a:r></a:p></c:rich></c:tx>${titleManualLayoutXml}${titleTxPrXml}</c:title>`
+    : '';
+  const valAxTitleTxPrXml = valAxTitleTxPr ? `<c:txPr>${valAxTitleTxPr}</c:txPr>` : '';
+  const valAxTitleXml = valAxTitleText
+    ? `<c:title><c:tx><c:rich><a:bodyPr rot="-5400000"/><a:lstStyle/><a:p><a:r><a:t>${valAxTitleText}</a:t></a:r></a:p></c:rich></c:tx>${valAxTitleTxPrXml}</c:title>`
     : '';
 
   return `<c:chartSpace
@@ -204,14 +217,13 @@ function buildChartSpaceXml(opts: {
           <c:delete val="${valAxDeleted ? '1' : '0'}"/>
           <c:axPos val="l"/>
           <c:tickLblPos val="nextTo"/>
+          ${valAxTitleXml}
           <c:crossAx val="1"/>
         </c:valAx>
       </c:plotArea>
       ${legendXml}
     </c:chart>
-    <c:spPr>
-      <a:noFill/>
-    </c:spPr>
+    ${chartSpaceSpPrXml}
   </c:chartSpace>`;
 }
 
@@ -605,6 +617,38 @@ describe('ChartRenderer', () => {
 
       const xAxis = option.xAxis as any;
       expect(xAxis?.axisLine?.lineStyle?.color).toBeDefined();
+    });
+
+    it('should render value axis titles as ECharts axis names', () => {
+      const valAxTitleTxPr = `
+        <a:bodyPr rot="-5400000"/>
+        <a:lstStyle/>
+        <a:p>
+          <a:pPr>
+            <a:defRPr sz="1200">
+              <a:solidFill><a:srgbClr val="222222"/></a:solidFill>
+              <a:latin typeface="+mn-lt"/>
+              <a:ea typeface="+mn-ea"/>
+            </a:defRPr>
+          </a:pPr>
+        </a:p>`;
+
+      const xml = buildChartSpaceXml({
+        hasLegend: false,
+        valAxDeleted: false,
+        valAxTitleText: 'Training Speed (iters/s)',
+        valAxTitleTxPr,
+      });
+      const { option } = parseChartOption(xml);
+
+      const yAxis = option.yAxis as any;
+      expect(yAxis.name).toBe('Training Speed (iters/s)');
+      expect(yAxis.nameLocation).toBe('middle');
+      expect(yAxis.nameRotate).toBe(-90);
+      expect(yAxis.nameTextStyle).toMatchObject({
+        color: '#222222',
+        fontSize: 12,
+      });
     });
 
     it('should apply chart clrMapOvr when resolving axis txPr schemeClr', () => {
@@ -2417,6 +2461,29 @@ describe('ChartRenderer', () => {
       const { option } = parseChartOption(xml);
       expect(option.backgroundColor).toBeDefined();
     });
+
+    it('should expose chartSpace outline style for the rendered chart frame', () => {
+      const xml = buildChartSpaceXml({
+        hasLegend: false,
+        valAxDeleted: false,
+        chartSpaceSpPr: `
+          <a:noFill/>
+          <a:ln w="25400" cap="flat" cmpd="sng" algn="ctr">
+            <a:solidFill><a:srgbClr val="AABBCC"/></a:solidFill>
+            <a:prstDash val="solid"/>
+          </a:ln>`,
+      });
+
+      const result = parseChartOption(xml) as ParseChartResult & {
+        chartFrameStyle?: { borderColor?: string; borderWidth?: number; borderStyle?: string };
+      };
+
+      expect(result.chartFrameStyle).toMatchObject({
+        borderColor: '#AABBCC',
+        borderStyle: 'solid',
+      });
+      expect(result.chartFrameStyle?.borderWidth).toBeGreaterThan(2);
+    });
   });
 
   // ==========================================================================
@@ -2472,6 +2539,45 @@ describe('ChartRenderer', () => {
       expect(wrapper.style.width).toBe('300px');
       expect(wrapper.style.height).toBe('250px');
       expect(wrapper.style.overflow).toBe('hidden');
+    });
+
+    it('should apply chartSpace outline to the chart wrapper', () => {
+      const ctx = createMockRenderContext();
+      ctx.presentation.charts = new Map([
+        [
+          'ppt/charts/chart1.xml',
+          parseXml(
+            buildChartSpaceXml({
+              hasLegend: false,
+              valAxDeleted: false,
+              chartSpaceSpPr: `
+                <a:noFill/>
+                <a:ln w="25400" cap="flat" cmpd="sng" algn="ctr">
+                  <a:solidFill><a:srgbClr val="AABBCC"/></a:solidFill>
+                  <a:prstDash val="solid"/>
+                </a:ln>`,
+            }),
+          ),
+        ],
+      ]);
+
+      const node: ChartNodeData = {
+        id: 'chart1',
+        name: 'Chart 1',
+        nodeType: 'chart',
+        chartPath: 'ppt/charts/chart1.xml',
+        position: { x: 0, y: 0 },
+        size: { w: 300, h: 250 },
+        rotation: 0,
+        flipH: false,
+        flipV: false,
+      };
+
+      const wrapper = renderChart(node, ctx);
+      expect(wrapper.style.boxSizing).toBe('border-box');
+      expect(wrapper.style.borderStyle).toBe('solid');
+      expect(wrapper.style.borderColor).toBe('rgb(170, 187, 204)');
+      expect(parseFloat(wrapper.style.borderWidth)).toBeGreaterThan(2);
     });
 
     it('should render placeholder when chart not found', () => {

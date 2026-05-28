@@ -276,6 +276,7 @@ interface MergedRunStyle {
   strikethrough?: boolean;
   color?: string;
   fontFamily?: string;
+  fontFamilyStack?: string[];
   hlinkClick?: string;
   /** Character spacing (tracking) in points — from a:spc @val (hundredths of pt). */
   letterSpacingPt?: number;
@@ -329,6 +330,8 @@ function mergeRunProps(target: MergedRunStyle, rPr: SafeXmlNode, ctx: RenderCont
   // Color from solidFill or gradFill child
   const solidFill = rPr.child('solidFill');
   if (solidFill.exists()) {
+    delete target.textGradientCss;
+    delete target.textNoFill;
     const { color, alpha } = resolveColor(solidFill, ctx);
     const hex = color.startsWith('#') ? color : `#${color}`;
     if (alpha < 1) {
@@ -340,35 +343,25 @@ function mergeRunProps(target: MergedRunStyle, rPr: SafeXmlNode, ctx: RenderCont
   }
   const gradFill = rPr.child('gradFill');
   if (gradFill.exists()) {
+    delete target.color;
+    delete target.textNoFill;
     const css = resolveGradientForText(gradFill, ctx);
     if (css) target.textGradientCss = css;
   }
 
-  // Font family
-  const latin = rPr.child('latin');
-  if (latin.exists()) {
-    const typeface = latin.attr('typeface');
-    if (typeface) {
-      target.fontFamily = resolveThemeFont(typeface, ctx);
-    }
+  // Font family. Office often writes separate Latin/East Asian typefaces in the
+  // same run; keep them as a CSS fallback stack so CJK glyphs use the EA face.
+  const fontFamilyStack: string[] = [];
+  for (const fontNodeName of ['latin', 'ea', 'cs'] as const) {
+    const fontNode = rPr.child(fontNodeName);
+    if (!fontNode.exists()) continue;
+    const typeface = fontNode.attr('typeface');
+    if (!typeface) continue;
+    fontFamilyStack.push(resolveThemeFont(typeface, ctx));
   }
-  if (!target.fontFamily) {
-    const ea = rPr.child('ea');
-    if (ea.exists()) {
-      const typeface = ea.attr('typeface');
-      if (typeface) {
-        target.fontFamily = resolveThemeFont(typeface, ctx);
-      }
-    }
-  }
-  if (!target.fontFamily) {
-    const cs = rPr.child('cs');
-    if (cs.exists()) {
-      const typeface = cs.attr('typeface');
-      if (typeface) {
-        target.fontFamily = resolveThemeFont(typeface, ctx);
-      }
-    }
+  if (fontFamilyStack.length > 0) {
+    target.fontFamily = fontFamilyStack[0];
+    target.fontFamilyStack = fontFamilyStack;
   }
 
   // Hyperlink
@@ -403,6 +396,8 @@ function mergeRunProps(target: MergedRunStyle, rPr: SafeXmlNode, ctx: RenderCont
 
   // Text noFill: a:noFill on rPr makes text interior transparent
   if (rPr.child('noFill').exists()) {
+    delete target.color;
+    delete target.textGradientCss;
     target.textNoFill = true;
   }
 
@@ -459,6 +454,94 @@ function resolveThemeFont(typeface: string, ctx: RenderContext): string {
     return ctx.theme.minorFont[mapping[key] || 'latin'] || typeface;
   }
   return typeface;
+}
+
+const CSS_GENERIC_FONT_FAMILIES = new Set([
+  'serif',
+  'sans-serif',
+  'monospace',
+  'cursive',
+  'fantasy',
+  'system-ui',
+  'ui-serif',
+  'ui-sans-serif',
+  'ui-monospace',
+  'emoji',
+  'math',
+  'fangsong',
+]);
+
+const CJK_SANS_FALLBACKS = [
+  'PingFang SC',
+  'Hiragino Sans GB',
+  'Noto Sans CJK SC',
+  'Source Han Sans SC',
+  'Arial Unicode MS',
+  'sans-serif',
+];
+
+const CJK_FONT_FAMILY_ALIAS_KEYS = new Set([
+  'microsoft yahei',
+  'microsoft yahei ui',
+  '微软雅黑',
+  'dengxian',
+  '等线',
+  'simhei',
+  '黑体',
+  'heiti sc',
+]);
+
+const FONT_FAMILY_ALIASES: Record<string, string[]> = {
+  calibri: ['Calibri', 'Aptos', 'Arial', 'Helvetica', 'sans-serif'],
+  'calibri light': ['Calibri Light', 'Aptos Display', 'Aptos', 'Arial', 'Helvetica', 'sans-serif'],
+  aptos: ['Aptos', 'Arial', 'Helvetica', 'sans-serif'],
+  'aptos display': ['Aptos Display', 'Aptos', 'Arial', 'Helvetica', 'sans-serif'],
+  'microsoft yahei': ['Microsoft YaHei', '微软雅黑'],
+  'microsoft yahei ui': ['Microsoft YaHei UI', 'Microsoft YaHei', '微软雅黑'],
+  微软雅黑: ['微软雅黑', 'Microsoft YaHei'],
+  dengxian: ['DengXian', '等线'],
+  等线: ['等线', 'DengXian'],
+  simhei: ['SimHei', '黑体'],
+  黑体: ['黑体', 'SimHei'],
+  'heiti sc': ['Heiti SC', '黑体', 'SimHei'],
+};
+
+function normalizeFontFamilyName(fontFamily: string): string {
+  return fontFamily
+    .trim()
+    .replace(/^['"]|['"]$/g, '')
+    .toLowerCase();
+}
+
+function cssFontFamilyToken(fontFamily: string): string {
+  const normalized = normalizeFontFamilyName(fontFamily);
+  if (CSS_GENERIC_FONT_FAMILIES.has(normalized)) {
+    return normalized;
+  }
+  return `"${fontFamily.trim().replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+}
+
+function expandFontFamilyAliases(fontFamily: string): string[] {
+  const normalized = normalizeFontFamilyName(fontFamily);
+  return FONT_FAMILY_ALIASES[normalized] ?? [fontFamily.trim()];
+}
+
+function cssFontFamilyStack(fontFamily: string | string[]): string {
+  const baseFonts = Array.isArray(fontFamily)
+    ? fontFamily.flatMap(expandFontFamilyAliases)
+    : expandFontFamilyAliases(fontFamily);
+  const needsCjkFallbacks = baseFonts.some((font) =>
+    CJK_FONT_FAMILY_ALIAS_KEYS.has(normalizeFontFamilyName(font)),
+  );
+  const stack = needsCjkFallbacks ? [...baseFonts, ...CJK_SANS_FALLBACKS] : baseFonts;
+  const seen = new Set<string>();
+  const unique = stack.filter((font) => {
+    const key = normalizeFontFamilyName(font);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return unique.map(cssFontFamilyToken).join(', ');
 }
 
 /**
@@ -852,8 +935,23 @@ export function renderTextBody(
     if (bulletPrefix) {
       const bulletSpan = document.createElement('span');
       bulletSpan.textContent = bulletPrefix + ' ';
+      const marginLeft = merged.marginLeft;
+      const textIndent = merged.textIndent;
+      const useHangingBulletGutter =
+        marginLeft !== undefined && marginLeft > 0 && textIndent !== undefined && textIndent < 0;
+      if (useHangingBulletGutter) {
+        const markerLeft = Math.max(0, marginLeft + textIndent);
+        const markerWidth = Math.max(0, marginLeft - markerLeft);
+        paraDiv.style.position = 'relative';
+        paraDiv.style.textIndent = '0px';
+        bulletSpan.style.position = 'absolute';
+        bulletSpan.style.left = `${markerLeft}px`;
+        bulletSpan.style.top = '0px';
+        bulletSpan.style.width = `${markerWidth}px`;
+        bulletSpan.style.whiteSpace = 'pre';
+      }
       if (merged.bulletFont) {
-        bulletSpan.style.fontFamily = merged.bulletFont;
+        bulletSpan.style.fontFamily = cssFontFamilyStack(merged.bulletFont);
       }
       const bulletFontSize = merged.bulletSizePt ?? effectiveFontSize * (merged.bulletSizePct ?? 1);
       bulletSpan.style.fontSize = `${bulletFontSize * fontScale}pt`;
@@ -1117,15 +1215,15 @@ export function renderTextBody(
         run.properties?.child('ea').exists() ||
         run.properties?.child('cs').exists();
       const effectiveFont = hasExplicitRunFont
-        ? runStyle.fontFamily
-        : (options?.cellTextFontFamily ?? runStyle.fontFamily);
+        ? (runStyle.fontFamilyStack ?? runStyle.fontFamily)
+        : (options?.cellTextFontFamily ?? runStyle.fontFamilyStack ?? runStyle.fontFamily);
       if (effectiveFont) {
-        element.style.fontFamily = `"${effectiveFont}"`;
+        element.style.fontFamily = cssFontFamilyStack(effectiveFont);
       } else {
         // Fallback to theme minor font
         const fallback = ctx.theme.minorFont.latin || ctx.theme.minorFont.ea;
         if (fallback) {
-          element.style.fontFamily = `"${fallback}"`;
+          element.style.fontFamily = cssFontFamilyStack(fallback);
         }
       }
 

@@ -18,4 +18,10 @@ describe('test pages ZIP limits', () => {
       );
     }
   });
+
+  it('keeps the single-slide preview from flex-shrinking and clipping wide slides', () => {
+    expect(readPage('render-slide.html')).toMatch(
+      /#slide-container\s+\.slide-wrapper\s*\{[^}]*flex:\s*0\s+0\s+auto/s,
+    );
+  });
 });

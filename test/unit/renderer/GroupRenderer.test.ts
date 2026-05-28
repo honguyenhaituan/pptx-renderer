@@ -387,6 +387,63 @@ describe('renderGroup — wrapper element', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Group-level effects
+// ---------------------------------------------------------------------------
+
+describe('renderGroup — group-level effects', () => {
+  it('applies grpSpPr outerShdw to the group wrapper', () => {
+    const groupSource = xml(`
+      <p:grpSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvGrpSpPr><p:cNvPr id="1" name="G"/><p:nvPr/></p:nvGrpSpPr>
+        <p:grpSpPr>
+          <a:xfrm>
+            <a:off x="0" y="0"/><a:ext cx="914400" cy="914400"/>
+            <a:chOff x="0" y="0"/><a:chExt cx="914400" cy="914400"/>
+          </a:xfrm>
+          <a:effectLst>
+            <a:outerShdw blurRad="12700" dist="25400" dir="0" rotWithShape="0">
+              <a:srgbClr val="336699"><a:alpha val="50000"/></a:srgbClr>
+            </a:outerShdw>
+          </a:effectLst>
+        </p:grpSpPr>
+      </p:grpSp>
+    `);
+    const group = makeGroup([], { source: groupSource });
+
+    const el = renderGroup(group, createMockRenderContext(), stubRenderNode);
+
+    expect(el.style.filter).toContain('drop-shadow');
+    expect(el.style.filter).toContain('rgba(51,102,153,0.500)');
+  });
+
+  it('applies grpSpPr reflection to the group wrapper', () => {
+    const groupSource = xml(`
+      <p:grpSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvGrpSpPr><p:cNvPr id="1" name="G"/><p:nvPr/></p:nvGrpSpPr>
+        <p:grpSpPr>
+          <a:xfrm>
+            <a:off x="0" y="0"/><a:ext cx="914400" cy="914400"/>
+            <a:chOff x="0" y="0"/><a:chExt cx="914400" cy="914400"/>
+          </a:xfrm>
+          <a:effectLst>
+            <a:reflection blurRad="12700" stA="37000" endA="0" endPos="55000"
+                          dir="5400000" sy="-100000" algn="bl" rotWithShape="0"/>
+          </a:effectLst>
+        </p:grpSpPr>
+      </p:grpSp>
+    `);
+    const group = makeGroup([], { source: groupSource });
+
+    const el = renderGroup(group, createMockRenderContext(), stubRenderNode);
+
+    expect((el.style as any).webkitBoxReflect).toContain('linear-gradient');
+    expect((el.style as any).webkitBoxReflect).toContain('below');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // parseGroupChild dispatch — 'sp' tag
 // ---------------------------------------------------------------------------
 

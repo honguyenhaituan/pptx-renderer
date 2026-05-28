@@ -6,10 +6,84 @@ import { GroupNodeData } from '../model/nodes/GroupNode';
 import { RenderContext } from './RenderContext';
 import { BaseNodeData } from '../model/nodes/BaseNode';
 import type { ShapeNodeData } from '../model/nodes/ShapeNode';
+import { emuToPx } from '../parser/units';
+import { SafeXmlNode } from '../parser/XmlParser';
+import { hexToRgb } from '../utils/color';
+import { resolveColor } from './StyleResolver';
 
 function rotationSwapsAxes(rotation: number): boolean {
   const normalized = ((rotation % 360) + 360) % 360;
   return Math.abs(normalized - 90) < 0.0001 || Math.abs(normalized - 270) < 0.0001;
+}
+
+function resolveEffectColor(node: SafeXmlNode, ctx: RenderContext, fallback: string): string {
+  const { color, alpha } = resolveColor(node, ctx);
+  if (!color) return fallback;
+  const hex = color.startsWith('#') ? color : `#${color}`;
+  const { r, g, b } = hexToRgb(hex);
+  return `rgba(${r},${g},${b},${alpha.toFixed(3)})`;
+}
+
+function applyGroupOuterShadow(
+  wrapper: HTMLElement,
+  node: GroupNodeData,
+  outerShdw: SafeXmlNode,
+  ctx: RenderContext,
+): void {
+  const dir = outerShdw.numAttr('dir') ?? 0;
+  const distPx = emuToPx(outerShdw.numAttr('dist') ?? 0);
+  const blurPx = emuToPx(outerShdw.numAttr('blurRad') ?? 0);
+  const dirDeg = dir / 60000;
+  const offsetX = distPx * Math.cos((dirDeg * Math.PI) / 180);
+  const offsetY = distPx * Math.sin((dirDeg * Math.PI) / 180);
+  const shadowColor = resolveEffectColor(outerShdw, ctx, 'rgba(0,0,0,0.4)');
+
+  const sx = outerShdw.numAttr('sx');
+  const sy = outerShdw.numAttr('sy');
+  if (sx != null && sy != null && sx > 0 && sy > 0) {
+    const scaleX = sx / 100000;
+    const scaleY = sy / 100000;
+    const spreadX = (node.size.w * (scaleX - 1)) / 2;
+    const spreadY = (node.size.h * (scaleY - 1)) / 2;
+    const spread = Math.max(0, (spreadX + spreadY) / 2);
+    wrapper.style.boxShadow = `${offsetX.toFixed(1)}px ${offsetY.toFixed(1)}px ${blurPx.toFixed(1)}px ${spread.toFixed(1)}px ${shadowColor}`;
+    return;
+  }
+
+  wrapper.style.filter = `drop-shadow(${offsetX.toFixed(1)}px ${offsetY.toFixed(1)}px ${blurPx.toFixed(1)}px ${shadowColor})`;
+}
+
+function applyGroupReflection(wrapper: HTMLElement, reflection: SafeXmlNode): void {
+  const dist = emuToPx(reflection.numAttr('dist') ?? 0);
+  const stA = (reflection.numAttr('stA') ?? 50000) / 100000;
+  const endA = (reflection.numAttr('endA') ?? 0) / 100000;
+  const stPos = Math.max(0, Math.min(100, (reflection.numAttr('stPos') ?? 0) / 1000));
+  const endPos = Math.max(0, Math.min(100, (reflection.numAttr('endPos') ?? 100000) / 1000));
+  const mask = `linear-gradient(to bottom, rgba(255,255,255,${stA.toFixed(3)}) ${stPos.toFixed(1)}%, rgba(255,255,255,${endA.toFixed(3)}) ${endPos.toFixed(1)}%)`;
+  const reflectValue = `below ${dist.toFixed(1)}px ${mask}`;
+  wrapper.style.setProperty('-webkit-box-reflect', reflectValue);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (wrapper.style as any).webkitBoxReflect = reflectValue;
+}
+
+function applyGroupEffects(
+  wrapper: HTMLElement,
+  node: GroupNodeData,
+  ctx: RenderContext,
+  grpSpPr: SafeXmlNode,
+): void {
+  const effectLst = grpSpPr.child('effectLst');
+  if (!effectLst.exists()) return;
+
+  const outerShdw = effectLst.child('outerShdw');
+  if (outerShdw.exists()) {
+    applyGroupOuterShadow(wrapper, node, outerShdw, ctx);
+  }
+
+  const reflection = effectLst.child('reflection');
+  if (reflection.exists()) {
+    applyGroupReflection(wrapper, reflection);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -64,6 +138,8 @@ export function renderGroup(
   const grpSpPr = node.source.child('grpSpPr');
   const childCtx: RenderContext = { ...ctx };
   if (grpSpPr.exists()) {
+    applyGroupEffects(wrapper, node, ctx, grpSpPr);
+
     // Check if the group itself has a fill (solidFill, gradFill, etc.)
     // that children can inherit via grpFill
     const FILL_TAGS = ['solidFill', 'gradFill', 'blipFill', 'pattFill'];
@@ -206,7 +282,6 @@ import { parseTableNode } from '../model/nodes/TableNode';
 import { parseGroupNode } from '../model/nodes/GroupNode';
 import { parseChartNode } from '../model/nodes/ChartNode';
 import { parseOleFrameAsPicture } from '../model/Slide';
-import { SafeXmlNode } from '../parser/XmlParser';
 
 /**
  * Parse a raw XML child node from a group's spTree into a typed node object.

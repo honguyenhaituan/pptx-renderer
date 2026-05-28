@@ -794,6 +794,180 @@ describe('ShapeRenderer', () => {
     }
   });
 
+  it('does not force wrapped CJK spAutoFit text into one tiny line for font metric overhang (ai-computing slide 20)', () => {
+    const isFitContainer = (el: HTMLElement) =>
+      el.style.display === 'flex' && el.style.flexDirection === 'column';
+    const clientWidthSpy = vi
+      .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 764 : 0;
+      });
+    const clientHeightSpy = vi
+      .spyOn(HTMLElement.prototype, 'clientHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 55 : 0;
+      });
+    const scrollWidthSpy = vi
+      .spyOn(HTMLElement.prototype, 'scrollWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) && this.style.whiteSpace === 'nowrap' ? 1487 : 765;
+      });
+    const scrollHeightSpy = vi
+      .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) && this.style.whiteSpace === 'nowrap' ? 55 : 66;
+      });
+
+    try {
+      const xml = `
+        <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+              xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <p:nvSpPr>
+            <p:cNvPr id="7" name="文本框 6"/>
+            <p:cNvSpPr txBox="1"/>
+            <p:nvPr/>
+          </p:nvSpPr>
+          <p:spPr>
+            <a:xfrm><a:off x="4553169" y="1596670"/><a:ext cx="7274890" cy="523220"/></a:xfrm>
+            <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+            <a:noFill/>
+          </p:spPr>
+          <p:txBody>
+            <a:bodyPr wrap="square"><a:spAutoFit/></a:bodyPr>
+            <a:lstStyle/>
+            <a:p>
+              <a:r><a:rPr sz="1400"><a:latin typeface="微软雅黑"/></a:rPr><a:t>DRF（Dominant Resource Fairness）是主资源公平调度策略，应用于大批量提交AI训练和大数据作业的场景，可</a:t></a:r>
+              <a:r><a:rPr sz="1400" b="1"><a:latin typeface="微软雅黑"/></a:rPr><a:t>增强集群业务的吞吐量，整体缩短业务执行时间，提高训练性能。</a:t></a:r>
+            </a:p>
+          </p:txBody>
+        </p:sp>
+      `;
+
+      const el = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+      const textContainer = Array.from(el.querySelectorAll('div')).find(
+        (div) =>
+          div.textContent?.includes('Dominant Resource Fairness') &&
+          div.style.flexDirection === 'column',
+      ) as HTMLElement | undefined;
+
+      expect(textContainer).toBeDefined();
+      expect(textContainer!.style.transform).not.toContain('scale(');
+      expect(textContainer!.style.width).toBe('100%');
+      expect(textContainer!.style.height).toBe('100%');
+    } finally {
+      clientWidthSpy.mockRestore();
+      clientHeightSpy.mockRestore();
+      scrollWidthSpy.mockRestore();
+      scrollHeightSpy.mockRestore();
+    }
+  });
+
+  it('remeasures dynamic spAutoFit after fonts are ready to remove stale fallback-font scaling', async () => {
+    const isFitContainer = (el: HTMLElement) =>
+      el.style.display === 'flex' && el.style.flexDirection === 'column';
+    let fontsReady = false;
+    let resolveFontsReady!: () => void;
+    const fontsReadyPromise = new Promise<void>((resolve) => {
+      resolveFontsReady = () => {
+        fontsReady = true;
+        resolve();
+      };
+    });
+    const originalFontsDescriptor = Object.getOwnPropertyDescriptor(document, 'fonts');
+    Object.defineProperty(document, 'fonts', {
+      configurable: true,
+      value: {
+        status: 'loading',
+        ready: fontsReadyPromise,
+      },
+    });
+    const clientWidthSpy = vi
+      .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? (fontsReady ? 764 : 764) : 0;
+      });
+    const clientHeightSpy = vi
+      .spyOn(HTMLElement.prototype, 'clientHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 55 : 0;
+      });
+    const scrollWidthSpy = vi
+      .spyOn(HTMLElement.prototype, 'scrollWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        if (!isFitContainer(this)) return 0;
+        if (this.style.whiteSpace === 'nowrap') return fontsReady ? 764 : 1487;
+        return 764;
+      });
+    const scrollHeightSpy = vi
+      .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        if (!isFitContainer(this)) return 0;
+        if (this.style.whiteSpace === 'nowrap') return 55;
+        return fontsReady ? 61 : 120;
+      });
+
+    try {
+      const xml = `
+        <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+              xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <p:nvSpPr>
+            <p:cNvPr id="7" name="文本框 6"/>
+            <p:cNvSpPr txBox="1"/>
+            <p:nvPr/>
+          </p:nvSpPr>
+          <p:spPr>
+            <a:xfrm><a:off x="4553169" y="1596670"/><a:ext cx="7274890" cy="523220"/></a:xfrm>
+            <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+            <a:noFill/>
+          </p:spPr>
+          <p:txBody>
+            <a:bodyPr wrap="square"><a:spAutoFit/></a:bodyPr>
+            <a:lstStyle/>
+            <a:p>
+              <a:r><a:rPr sz="1400"><a:latin typeface="微软雅黑"/></a:rPr><a:t>DRF（Dominant Resource Fairness）是主资源公平调度策略，应用于大批量提交AI训练和大数据作业的场景，可增强集群业务的吞吐量，整体缩短业务执行时间，提高训练性能。</a:t></a:r>
+            </a:p>
+          </p:txBody>
+        </p:sp>
+      `;
+
+      const el = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+      const textContainer = Array.from(el.querySelectorAll('div')).find(
+        (div) =>
+          div.textContent?.includes('Dominant Resource Fairness') &&
+          div.style.flexDirection === 'column',
+      ) as HTMLElement | undefined;
+
+      expect(textContainer).toBeDefined();
+      expect(textContainer!.style.transform).toContain('scale(');
+
+      document.body.appendChild(el);
+      resolveFontsReady();
+      await fontsReadyPromise;
+      await new Promise<void>((resolve) => {
+        if (typeof requestAnimationFrame === 'function') {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        } else {
+          setTimeout(resolve, 0);
+        }
+      });
+
+      expect(textContainer!.style.transform).not.toContain('scale(');
+      expect(textContainer!.style.width).toBe('100%');
+      expect(textContainer!.style.height).toBe('100%');
+    } finally {
+      clientWidthSpy.mockRestore();
+      clientHeightSpy.mockRestore();
+      scrollWidthSpy.mockRestore();
+      scrollHeightSpy.mockRestore();
+      document.body.innerHTML = '';
+      if (originalFontsDescriptor) {
+        Object.defineProperty(document, 'fonts', originalFontsDescriptor);
+      } else {
+        delete (document as Document & { fonts?: FontFaceSet }).fonts;
+      }
+    }
+  });
+
   it('does not shrink bullet spAutoFit text because hanging indent uses internal width (opentelemetry slide 9)', () => {
     const isFitContainer = (el: HTMLElement) =>
       el.style.display === 'flex' && el.style.flexDirection === 'column';
@@ -877,8 +1051,13 @@ describe('ShapeRenderer', () => {
       expect(textContainer!.style.transform).not.toContain('scale(');
       expect(para?.style.marginLeft).toBe('');
       expect(para?.style.paddingLeft).toBe('30px');
-      expect(para?.style.textIndent).toBe('-30px');
+      expect(para?.style.textIndent).toBe('0px');
+      expect(para?.style.position).toBe('relative');
       expect(para?.style.boxSizing).toBe('border-box');
+      const bullet = para?.querySelector('span') as HTMLElement | null;
+      expect(bullet?.style.position).toBe('absolute');
+      expect(bullet?.style.left).toBe('0px');
+      expect(bullet?.style.width).toBe('30px');
     } finally {
       clientWidthSpy.mockRestore();
       clientHeightSpy.mockRestore();
@@ -1986,6 +2165,40 @@ describe('ShapeRenderer', () => {
     expect(stroke).toContain('url(#');
     const linearGrad = defs?.querySelector('linearGradient');
     expect(linearGrad?.getAttribute('color-interpolation')).toBe('linearRGB');
+  });
+
+  it('uses shape bounds for non-line gradient stroke coordinates (xcloud-intro slide 13 trapezoid)', () => {
+    const xml = `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="26" name="梯形 25"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="7701328" cy="427148"/></a:xfrm>
+          <a:prstGeom prst="trapezoid">
+            <a:avLst><a:gd name="adj" fmla="val 109483"/></a:avLst>
+          </a:prstGeom>
+          <a:noFill/>
+          <a:ln w="11589" algn="in">
+            <a:gradFill>
+              <a:gsLst>
+                <a:gs pos="0"><a:srgbClr val="3B51D3"><a:alpha val="0"/></a:srgbClr></a:gs>
+                <a:gs pos="100000"><a:srgbClr val="3B51D3"><a:alpha val="50000"/></a:srgbClr></a:gs>
+              </a:gsLst>
+              <a:lin ang="5400000" scaled="1"/>
+            </a:gradFill>
+          </a:ln>
+        </p:spPr>
+      </p:sp>
+    `;
+    const shapeNode = parseShapeNode(parseXml(xml));
+    const el = renderShape(shapeNode, createMockRenderContext());
+    const gradient = el.querySelector('linearGradient[id^="grad-stroke-"]');
+
+    expect(gradient).toBeTruthy();
+    expect(Number(gradient!.getAttribute('x1'))).toBeCloseTo(shapeNode.size.w / 2, 1);
+    expect(Number(gradient!.getAttribute('x2'))).toBeCloseTo(shapeNode.size.w / 2, 1);
+    expect(Number(gradient!.getAttribute('y1'))).toBeCloseTo(0, 1);
+    expect(Number(gradient!.getAttribute('y2'))).toBeCloseTo(shapeNode.size.h, 1);
   });
 
   it('renders shape with blipFill (image fill) creates clipped image', () => {
