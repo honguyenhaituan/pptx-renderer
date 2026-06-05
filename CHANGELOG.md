@@ -7,6 +7,36 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-06-05
+
+### Added
+
+- Added model-level text search APIs: `buildTextIndex()`, `searchText()`,
+  `searchPresentation()`, and `PptxViewer.searchText()`.
+- Added exported search result and option types, including `TextSearchResult`,
+  `TextIndexEntry`, `TextSearchOptions`, `TextIndexOptions`, and `TextBounds`.
+- Added node-level search highlight helpers on `PptxViewer`:
+  `highlightSearchResult()` and `clearSearchHighlights()`.
+- Added `SearchHighlightOptions` so consumers can customize highlight class names,
+  colors, border width, radius, padding, shadows, z-index, and inline styles.
+- Added scaled slide preview rendering via `renderThumbnailToContainer()` for
+  thumbnail/navigation surfaces.
+- Added lazy thumbnail navigation and search result navigation to the dev page and
+  public demo.
+
+### Changed
+
+- String text searches are case-insensitive by default and can opt into exact casing
+  with `matchCase: true`.
+- RegExp text searches now preserve caller-provided flags; the search layer only adds
+  `g` so all matches can be collected.
+- Dev/demo thumbnail cards are smaller and keep active selection styling layout-stable.
+- Search UI in dev/demo now includes an `Aa` match-case toggle and uses the viewer
+  highlight API instead of rewriting rendered text.
+- Documentation now covers search/highlight API boundaries, thumbnail performance
+  trade-offs, and the distinction between scaled DOM/SVG previews and bitmap
+  thumbnail generation.
+
 ## [1.0.4] - 2026-06-02
 
 ### Added

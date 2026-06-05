@@ -543,7 +543,7 @@ Dev pages at `http://127.0.0.1:5173`:
 
 | Page                            | Purpose                                   |
 | ------------------------------- | ----------------------------------------- |
-| `/test/pages/index.html`        | Upload and preview any PPTX               |
+| `/test/pages/index.html`        | Upload preview with search and thumbnails |
 | `/test/pages/render-slide.html` | Single slide at native resolution         |
 | `/test/pages/e2e-compare.html`  | Side-by-side PDF vs HTML with SSIM scores |
 | `/test/pages/export.html`       | Model JSON tree viewer                    |
