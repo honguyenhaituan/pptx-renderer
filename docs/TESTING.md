@@ -201,13 +201,13 @@ there is a real 3D rendering implementation and corresponding oracle coverage.
 
 ## Test Pages
 
-| Page                                 | Purpose                           |
-| ------------------------------------ | --------------------------------- |
-| `/test/pages/index.html`             | Upload and preview any PPTX       |
-| `/test/pages/render-slide.html`      | Single slide at native resolution |
-| `/test/pages/e2e-compare.html`       | E2E dashboard with SSIM scores    |
-| `/test/pages/compare-renderers.html` | Renderer-to-renderer comparison   |
-| `/test/pages/export.html`            | Model JSON tree viewer            |
+| Page                                 | Purpose                                                        |
+| ------------------------------------ | -------------------------------------------------------------- |
+| `/test/pages/index.html`             | Upload preview with model search and lazy thumbnail navigation |
+| `/test/pages/render-slide.html`      | Single slide at native resolution                              |
+| `/test/pages/e2e-compare.html`       | E2E dashboard with SSIM scores                                 |
+| `/test/pages/compare-renderers.html` | Renderer-to-renderer comparison                                |
+| `/test/pages/export.html`            | Model JSON tree viewer                                         |
 
 URL params for list rendering performance: `listStrategy`, `listBatchSize`, `windowedInitialSlides`, `windowedOverscanViewport`.
 

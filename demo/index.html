@@ -330,9 +330,241 @@
       }
 
       /* ── Container ── */
+      .workspace {
+        display: flex;
+        align-items: flex-start;
+        gap: 18px;
+        width: 100%;
+        max-width: 1480px;
+        margin: 0 auto;
+        flex: 1;
+      }
+      .side-panel {
+        position: sticky;
+        top: 78px;
+        width: 188px;
+        max-height: calc(100vh - 94px);
+        padding: 16px;
+        overflow: hidden;
+        border-right: 1px solid var(--border);
+        background: var(--bg-surface);
+        flex: 0 0 auto;
+      }
+      .panel-title,
+      .search-summary {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .search-box {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 14px;
+      }
+      .search-query-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .search-box input {
+        width: 100%;
+        min-width: 0;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--bg-raised);
+        color: var(--text);
+        padding: 9px 10px;
+        font-family: var(--font);
+        font-size: 13px;
+      }
+      .search-box input:focus {
+        outline: 2px solid var(--blue);
+        outline-offset: 1px;
+      }
+      .search-box input:disabled {
+        opacity: 0.55;
+      }
+      .search-match-case-toggle input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+      }
+      .search-match-case-toggle span {
+        width: 34px;
+        height: 34px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--bg-raised);
+        color: var(--text);
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 700;
+        transition: all 0.2s ease;
+      }
+      .search-match-case-toggle input:checked + span {
+        border-color: var(--accent);
+        background: var(--accent-glow);
+        color: #fff;
+      }
+      .search-match-case-toggle input:focus-visible + span {
+        outline: 2px solid var(--blue);
+        outline-offset: 2px;
+      }
+      .search-match-case-toggle input:disabled + span {
+        opacity: 0.32;
+        cursor: not-allowed;
+      }
+      .search-controls {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .search-controls button {
+        width: 30px;
+        height: 28px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--bg-raised);
+        color: var(--text);
+        cursor: pointer;
+        font-family: var(--font);
+        font-size: 14px;
+        line-height: 1;
+        transition: all 0.2s ease;
+      }
+      .search-controls button:hover:not(:disabled) {
+        border-color: var(--accent);
+        background: var(--accent-glow);
+      }
+      .search-controls button:focus-visible {
+        outline: 2px solid var(--blue);
+        outline-offset: 2px;
+      }
+      .search-controls button:disabled {
+        opacity: 0.32;
+        cursor: not-allowed;
+      }
+      .search-position {
+        min-width: 58px;
+        color: var(--text-muted);
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+        font-weight: 600;
+        text-align: center;
+      }
+      .search-results {
+        max-height: 160px;
+        overflow: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 14px;
+      }
+      .search-result {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--bg-raised);
+        color: var(--text);
+        padding: 8px;
+        font-family: var(--font);
+        font-size: 12px;
+        text-align: left;
+        cursor: pointer;
+      }
+      .search-result:hover,
+      .search-result.active {
+        border-color: var(--accent);
+      }
+      .search-result.active {
+        background: var(--accent-glow);
+        box-shadow: inset 3px 0 0 var(--accent);
+      }
+      .search-result small {
+        display: block;
+        color: var(--text-muted);
+        margin-bottom: 4px;
+      }
+      .search-result mark {
+        border-radius: 3px;
+        background: rgba(255, 214, 102, 0.95);
+        color: var(--bg-base);
+        padding: 0 2px;
+      }
+      .thumbnail-list {
+        max-height: calc(100vh - 360px);
+        min-height: 220px;
+        overflow: auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        padding-right: 4px;
+        margin-top: 10px;
+      }
+      .thumbnail-item {
+        width: 112px;
+        min-width: 112px;
+        max-width: 112px;
+        box-sizing: border-box;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--bg-raised);
+        color: var(--text);
+        padding: 6px;
+        font-family: var(--font);
+        text-align: left;
+        cursor: pointer;
+      }
+      .thumbnail-item:hover {
+        border-color: var(--accent);
+      }
+      .thumbnail-item.active {
+        background: var(--accent-glow);
+        box-shadow: inset 0 0 0 2px var(--accent);
+      }
+      .thumbnail-label {
+        display: block;
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-bottom: 4px;
+      }
+      .thumbnail-frame {
+        width: 96px;
+        height: 54px;
+        margin: 0 auto;
+        overflow: hidden;
+        background: #fff;
+        border-radius: 4px;
+      }
+      .search-highlight-overlay {
+        position: absolute;
+        z-index: 10000;
+        pointer-events: none;
+        border: 3px solid rgba(255, 214, 102, 0.95);
+        border-radius: 6px;
+        background: rgba(255, 214, 102, 0.16);
+        box-shadow: 0 0 0 2px rgba(11, 11, 20, 0.5);
+      }
+      .thumbnail-placeholder {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #667085;
+        background: #f4f6f8;
+        font-size: 10px;
+      }
       #pptx-container {
         padding: 28px;
-        max-width: 1200px;
+        min-width: 0;
         margin: 0 auto;
         flex: 1;
         width: 100%;
@@ -728,6 +960,27 @@
           gap: 4px;
           font-size: 11px;
         }
+        .workspace {
+          display: block;
+        }
+        .side-panel {
+          position: relative;
+          top: auto;
+          width: auto;
+          max-height: none;
+          border-right: 0;
+          border-bottom: 1px solid var(--border);
+        }
+        .thumbnail-list {
+          max-height: none;
+          min-height: 0;
+          flex-direction: row;
+          overflow-x: auto;
+          overflow-y: hidden;
+        }
+        .thumbnail-item {
+          min-width: 112px;
+        }
         #pptx-container {
           padding: 14px;
         }
@@ -810,30 +1063,54 @@
       <span>Drop .pptx file</span>
     </div>
 
-    <div id="pptx-container">
-      <div class="empty-state fade-in">
-        <div class="empty-hero">&#128202;</div>
-        <h2>Upload a .pptx file or try an example</h2>
-        <p>
-          Renders PowerPoint 2007+ files entirely in the browser. No server, no upload — everything
-          stays local.
-        </p>
-        <div class="empty-features">
-          <div class="empty-feature">
-            <div class="empty-feature-icon">&#9638;</div>
-            Shapes & SmartArt
+    <div class="workspace">
+      <aside class="side-panel">
+        <div class="search-box">
+          <label class="panel-title" for="search-input">Search</label>
+          <div class="search-query-row">
+            <input id="search-input" type="search" placeholder="Find text in slides" disabled />
+            <label class="search-match-case-toggle" title="Match case">
+              <input id="search-match-case" type="checkbox" disabled />
+              <span>Aa</span>
+            </label>
           </div>
-          <div class="empty-feature">
-            <div class="empty-feature-icon">&#128200;</div>
-            Charts
+          <div class="search-summary" id="search-summary">No deck loaded</div>
+          <div class="search-controls">
+            <button id="search-prev" type="button" title="Previous result" disabled>&#8593;</button>
+            <span class="search-position" id="search-position">0 / 0</span>
+            <button id="search-next" type="button" title="Next result" disabled>&#8595;</button>
           </div>
-          <div class="empty-feature">
-            <div class="empty-feature-icon">&#128196;</div>
-            Tables
-          </div>
-          <div class="empty-feature">
-            <div class="empty-feature-icon">&#127912;</div>
-            Themes
+        </div>
+        <div class="search-results" id="search-results"></div>
+        <div class="panel-title">Thumbnails</div>
+        <div class="thumbnail-list" id="thumbnail-list"></div>
+      </aside>
+
+      <div id="pptx-container">
+        <div class="empty-state fade-in">
+          <div class="empty-hero">&#128202;</div>
+          <h2>Upload a .pptx file or try an example</h2>
+          <p>
+            Renders PowerPoint 2007+ files entirely in the browser. No server, no upload —
+            everything stays local.
+          </p>
+          <div class="empty-features">
+            <div class="empty-feature">
+              <div class="empty-feature-icon">&#9638;</div>
+              Shapes & SmartArt
+            </div>
+            <div class="empty-feature">
+              <div class="empty-feature-icon">&#128200;</div>
+              Charts
+            </div>
+            <div class="empty-feature">
+              <div class="empty-feature-icon">&#128196;</div>
+              Tables
+            </div>
+            <div class="empty-feature">
+              <div class="empty-feature-icon">&#127912;</div>
+              Themes
+            </div>
           </div>
         </div>
       </div>
@@ -868,6 +1145,14 @@
       const slideIndicator = document.getElementById('slide-indicator');
       const btnPrev = document.getElementById('btn-prev');
       const btnNext = document.getElementById('btn-next');
+      const searchInput = document.getElementById('search-input');
+      const searchSummary = document.getElementById('search-summary');
+      const searchResultsEl = document.getElementById('search-results');
+      const searchPrev = document.getElementById('search-prev');
+      const searchNext = document.getElementById('search-next');
+      const searchPosition = document.getElementById('search-position');
+      const searchMatchCase = document.getElementById('search-match-case');
+      const thumbnailList = document.getElementById('thumbnail-list');
       const statSeps = [
         document.getElementById('stat-sep-1'),
         document.getElementById('stat-sep-2'),
@@ -878,6 +1163,12 @@
       let cachedBuffer = null;
       let currentMode = 'list';
       let totalSlides = 0;
+      let thumbnailObserver = null;
+      let searchMatches = [];
+      let activeSearchIndex = -1;
+      let activeSearchHighlight = null;
+      let searchHighlightTimer = 0;
+      const thumbnailHandles = new Map();
 
       // Keyboard shortcut hint
       const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
@@ -923,6 +1214,8 @@
       function showLoaded(show) {
         clearBtn.style.display = show ? 'inline-block' : 'none';
         modeToggle.style.display = show ? 'inline-flex' : 'none';
+        searchInput.disabled = !show;
+        searchMatchCase.disabled = !show;
         updateSlideControls();
       }
 
@@ -997,6 +1290,7 @@
       function updateNavStrip(activeIndex) {
         const dots = slideNavStrip.querySelectorAll('.slide-nav-dot');
         dots.forEach((d, i) => d.classList.toggle('active', i === activeIndex));
+        markActiveThumbnail(activeIndex);
       }
 
       const emptyHTML = `
@@ -1013,11 +1307,13 @@
         </div>`;
 
       function resetToEmpty() {
+        cleanupThumbnails();
         if (viewer) viewer.destroy();
         viewer = null;
         cachedBuffer = null;
         totalSlides = 0;
         clearStats();
+        resetSidePanel();
         showLoaded(false);
         showError('');
         slideNavStrip.classList.remove('visible');
@@ -1029,10 +1325,12 @@
       async function renderBuffer(buffer, label, fileBytes) {
         showError('');
         clearStats();
+        resetSidePanel();
         container.innerHTML =
           '<div class="loading-state fade-in"><div class="spinner"></div><p>Rendering\u2026</p></div>';
 
         try {
+          cleanupThumbnails();
           if (viewer) viewer.destroy();
           cachedBuffer = buffer;
           const t0 = performance.now();
@@ -1045,6 +1343,12 @@
           viewer.on('slidechange', (e) => {
             updateNavStrip(e.detail.index);
             updateSlideControls();
+            const activeResult = searchMatches[activeSearchIndex];
+            if (activeResult && activeResult.slideIndex === e.detail.index) {
+              scheduleActiveSearchHighlight(activeResult);
+            } else {
+              resetActiveSearchOverlay();
+            }
           });
           const elapsed = performance.now() - t0;
 
@@ -1056,12 +1360,15 @@
           );
           showLoaded(true);
           buildNavStrip(viewer.slideCount, viewer.currentSlideIndex);
+          searchSummary.textContent = 'Ready';
+          setupThumbnails();
         } catch (e) {
           console.error('Render failed:', e);
           const errMsg = e instanceof Error ? e.message : String(e);
           showError(`Render failed: ${errMsg}`);
           container.innerHTML = `<div class="empty-state fade-in"><h2 style="color:var(--accent)">Failed to render</h2><p>${escapeHtml(errMsg)}</p></div>`;
           showLoaded(false);
+          resetSidePanel();
           slideNavStrip.classList.remove('visible');
         }
       }
@@ -1101,12 +1408,243 @@
         errorBanner.style.display = msg ? 'block' : 'none';
       }
 
+      function resetSidePanel() {
+        cleanupThumbnails();
+        resetActiveSearchOverlay();
+        searchMatches = [];
+        activeSearchIndex = -1;
+        searchInput.disabled = true;
+        searchMatchCase.disabled = true;
+        searchMatchCase.checked = false;
+        searchInput.value = '';
+        searchSummary.textContent = 'No deck loaded';
+        updateSearchControls();
+        searchResultsEl.innerHTML = '';
+        thumbnailList.innerHTML = '';
+      }
+
+      function cleanupThumbnails() {
+        if (thumbnailObserver) {
+          thumbnailObserver.disconnect();
+          thumbnailObserver = null;
+        }
+        for (const handle of thumbnailHandles.values()) {
+          handle.dispose();
+        }
+        thumbnailHandles.clear();
+      }
+
+      function setupThumbnails() {
+        cleanupThumbnails();
+        thumbnailList.innerHTML = '';
+        if (!viewer) return;
+
+        thumbnailObserver = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              const frame = entry.target;
+              const item = frame.closest('.thumbnail-item');
+              const index = Number(item?.dataset.slideIndex ?? '-1');
+              if (!Number.isInteger(index) || index < 0) continue;
+              if (entry.isIntersecting) {
+                mountThumbnail(index, frame);
+              } else {
+                unmountThumbnail(index, frame);
+              }
+            }
+          },
+          { root: thumbnailList, rootMargin: '180px 0px', threshold: 0 },
+        );
+
+        for (let i = 0; i < viewer.slideCount; i++) {
+          const item = document.createElement('button');
+          item.type = 'button';
+          item.className = 'thumbnail-item';
+          item.dataset.slideIndex = String(i);
+          item.addEventListener('click', () => {
+            if (currentMode === 'slide') {
+              goToSlideIdx(i);
+            } else {
+              viewer.goToSlide(i, { behavior: 'smooth', block: 'center' });
+            }
+          });
+
+          const label = document.createElement('span');
+          label.className = 'thumbnail-label';
+          label.textContent = `Slide ${i + 1}`;
+
+          const frame = document.createElement('div');
+          frame.className = 'thumbnail-frame';
+          frame.innerHTML = '<div class="thumbnail-placeholder">Pending</div>';
+
+          item.append(label, frame);
+          thumbnailList.appendChild(item);
+          thumbnailObserver.observe(frame);
+        }
+        markActiveThumbnail(viewer.currentSlideIndex);
+      }
+
+      function mountThumbnail(index, frame) {
+        if (!viewer || thumbnailHandles.has(index)) return;
+        frame.innerHTML = '';
+        const handle = viewer.renderThumbnailToContainer(index, frame, { width: 96 });
+        if (!handle) {
+          frame.innerHTML = '<div class="thumbnail-placeholder">Error</div>';
+          return;
+        }
+        thumbnailHandles.set(index, handle);
+        handle.ready.catch(() => {
+          frame.innerHTML = '<div class="thumbnail-placeholder">Error</div>';
+        });
+      }
+
+      function unmountThumbnail(index, frame) {
+        const handle = thumbnailHandles.get(index);
+        if (!handle) return;
+        handle.dispose();
+        thumbnailHandles.delete(index);
+        frame.innerHTML = '<div class="thumbnail-placeholder">Pending</div>';
+      }
+
+      function markActiveThumbnail(index) {
+        for (const item of thumbnailList.querySelectorAll('.thumbnail-item')) {
+          item.classList.toggle('active', Number(item.dataset.slideIndex) === index);
+        }
+      }
+
+      function normalizeSnippetText(text) {
+        return text.split(/\s+/).filter(Boolean).join(' ');
+      }
+
+      function renderHighlightedSnippet(result) {
+        const radius = 42;
+        const from = Math.max(0, result.matchStart - radius);
+        const to = Math.min(result.text.length, result.matchEnd + radius);
+        const snippet = document.createElement('span');
+        if (from > 0) snippet.append(document.createTextNode('...'));
+
+        const before = normalizeSnippetText(result.text.slice(from, result.matchStart));
+        if (before) snippet.append(document.createTextNode(before + ' '));
+
+        const mark = document.createElement('mark');
+        mark.textContent = result.text.slice(result.matchStart, result.matchEnd);
+        snippet.append(mark);
+
+        const after = normalizeSnippetText(result.text.slice(result.matchEnd, to));
+        if (after) snippet.append(document.createTextNode(' ' + after));
+        if (to < result.text.length) snippet.append(document.createTextNode('...'));
+        return snippet;
+      }
+
+      function updateSearchControls() {
+        const hasMatches = searchMatches.length > 0;
+        searchPrev.disabled = !hasMatches;
+        searchNext.disabled = !hasMatches;
+        searchPosition.textContent = hasMatches
+          ? `${activeSearchIndex + 1} / ${searchMatches.length}`
+          : `0 / ${searchMatches.length}`;
+      }
+
+      function renderSearchResults() {
+        searchResultsEl.innerHTML = '';
+        for (const [index, result] of searchMatches.entries()) {
+          const item = document.createElement('button');
+          item.type = 'button';
+          item.className = 'search-result';
+          item.dataset.searchIndex = String(index);
+          const slide = document.createElement('small');
+          slide.textContent = `Slide ${result.slideIndex + 1}`;
+          item.append(slide, renderHighlightedSnippet(result));
+          item.addEventListener('click', () => activateSearchResult(index));
+          searchResultsEl.appendChild(item);
+        }
+      }
+
+      function resetActiveSearchOverlay() {
+        if (searchHighlightTimer) {
+          window.clearTimeout(searchHighlightTimer);
+          searchHighlightTimer = 0;
+        }
+        activeSearchHighlight?.dispose();
+        activeSearchHighlight = null;
+        viewer?.clearSearchHighlights();
+      }
+
+      function scheduleActiveSearchHighlight(result, attempt = 0) {
+        if (searchHighlightTimer) window.clearTimeout(searchHighlightTimer);
+        searchHighlightTimer = window.setTimeout(
+          async () => {
+            searchHighlightTimer = 0;
+            if (!viewer) return;
+            viewer.clearSearchHighlights();
+            activeSearchHighlight = await viewer.highlightSearchResult(result, {
+              className: 'search-highlight-overlay',
+              scrollIntoView: false,
+            });
+            if (!activeSearchHighlight && attempt < 8) {
+              scheduleActiveSearchHighlight(result, attempt + 1);
+            }
+          },
+          attempt === 0 ? 80 : 140,
+        );
+      }
+
+      function activateSearchResult(index) {
+        if (!viewer || searchMatches.length === 0) return;
+        activeSearchIndex = (index + searchMatches.length) % searchMatches.length;
+        const result = searchMatches[activeSearchIndex];
+        for (const item of searchResultsEl.querySelectorAll('.search-result')) {
+          item.classList.toggle('active', Number(item.dataset.searchIndex) === activeSearchIndex);
+        }
+        updateSearchControls();
+        const activeItem = searchResultsEl.querySelector('.search-result.active');
+        activeItem?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        if (currentMode === 'slide') {
+          goToSlideIdx(result.slideIndex);
+        } else {
+          viewer.goToSlide(result.slideIndex, { behavior: 'smooth', block: 'center' });
+        }
+        scheduleActiveSearchHighlight(result);
+      }
+
+      function runSearch() {
+        if (!viewer) return;
+        const query = searchInput.value.trim();
+        if (!query) {
+          searchMatches = [];
+          activeSearchIndex = -1;
+          searchSummary.textContent = 'Ready';
+          searchResultsEl.innerHTML = '';
+          updateSearchControls();
+          resetActiveSearchOverlay();
+          return;
+        }
+
+        const allMatches = viewer.searchText(query, {
+          snippetRadius: 42,
+          matchCase: searchMatchCase.checked,
+        });
+        searchMatches = allMatches.slice(0, 50);
+        activeSearchIndex = searchMatches.length > 0 ? 0 : -1;
+        searchSummary.textContent = `${allMatches.length} match${allMatches.length === 1 ? '' : 'es'}${
+          allMatches.length > searchMatches.length ? ', first 50 shown' : ''
+        }`;
+        renderSearchResults();
+        updateSearchControls();
+        if (activeSearchIndex >= 0) {
+          activateSearchResult(activeSearchIndex);
+        } else {
+          resetActiveSearchOverlay();
+        }
+      }
+
       async function switchMode(mode) {
         if (mode === currentMode || !cachedBuffer) return;
         currentMode = mode;
         modeToggle.querySelectorAll('button').forEach((b) => {
           b.classList.toggle('active', b.dataset.mode === mode);
         });
+        cleanupThumbnails();
         if (viewer) viewer.destroy();
         viewer = await PptxViewer.open(cachedBuffer, container, {
           renderMode: currentMode,
@@ -1116,9 +1654,17 @@
         viewer.on('slidechange', (e) => {
           updateNavStrip(e.detail.index);
           updateSlideControls();
+          const activeResult = searchMatches[activeSearchIndex];
+          if (activeResult && activeResult.slideIndex === e.detail.index) {
+            scheduleActiveSearchHighlight(activeResult);
+          } else {
+            resetActiveSearchOverlay();
+          }
         });
         buildNavStrip(totalSlides, viewer.currentSlideIndex);
         updateSlideControls();
+        setupThumbnails();
+        runSearch();
       }
 
       // ── Events ──
@@ -1137,6 +1683,11 @@
       modeToggle.querySelectorAll('button').forEach((btn) => {
         btn.addEventListener('click', () => switchMode(btn.dataset.mode));
       });
+
+      searchInput.addEventListener('input', runSearch);
+      searchMatchCase.addEventListener('change', runSearch);
+      searchPrev.addEventListener('click', () => activateSearchResult(activeSearchIndex - 1));
+      searchNext.addEventListener('click', () => activateSearchResult(activeSearchIndex + 1));
 
       btnPrev.addEventListener('click', () =>
         goToSlideIdx(viewer ? viewer.currentSlideIndex - 1 : 0),

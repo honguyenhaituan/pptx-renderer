@@ -11,6 +11,9 @@ import {
   RECOMMENDED_ZIP_LIMITS,
   buildPresentation,
   serializePresentation,
+  buildTextIndex,
+  searchPresentation,
+  searchText,
   renderSlide,
 } from '../../src/index';
 
@@ -18,6 +21,9 @@ import {
 import type {
   ViewerOptions,
   ListRenderOptions,
+  ThumbnailRenderOptions,
+  SearchHighlightHandle,
+  SearchHighlightOptions,
   PptxViewerEventMap,
   RendererOptions,
   PreviewInput,
@@ -27,6 +33,12 @@ import type {
   SerializedPresentation,
   SerializedSlide,
   SerializedNode,
+  SearchTextKind,
+  TextBounds,
+  TextIndexEntry,
+  TextIndexOptions,
+  TextSearchOptions,
+  TextSearchResult,
   SlideHandle,
   SlideRendererOptions,
   PdfjsOptions,
@@ -58,6 +70,15 @@ import type {
 
 type _PdfjsOptionsCompileCheck = PdfjsOptions;
 type _PdfjsConfigCompileCheck = PdfjsConfig;
+type _ThumbnailRenderOptionsCompileCheck = ThumbnailRenderOptions;
+type _SearchHighlightHandleCompileCheck = SearchHighlightHandle;
+type _SearchHighlightOptionsCompileCheck = SearchHighlightOptions;
+type _SearchTextKindCompileCheck = SearchTextKind;
+type _TextBoundsCompileCheck = TextBounds;
+type _TextIndexEntryCompileCheck = TextIndexEntry;
+type _TextIndexOptionsCompileCheck = TextIndexOptions;
+type _TextSearchOptionsCompileCheck = TextSearchOptions;
+type _TextSearchResultCompileCheck = TextSearchResult;
 
 describe('package exports', () => {
   it('exports PptxViewer class', () => {
@@ -86,6 +107,12 @@ describe('package exports', () => {
 
   it('exports serializePresentation function', () => {
     expect(typeof serializePresentation).toBe('function');
+  });
+
+  it('exports text search helpers', () => {
+    expect(typeof buildTextIndex).toBe('function');
+    expect(typeof searchText).toBe('function');
+    expect(typeof searchPresentation).toBe('function');
   });
 
   it('exports renderSlide function', () => {

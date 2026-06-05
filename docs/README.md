@@ -2,9 +2,9 @@
 
 ## Core
 
-- [Architecture](ARCHITECTURE.md) — Three-layer pipeline (Parse -> Model -> Render), SafeXmlNode pattern, DOM construction strategy
-- [Testing](TESTING.md) — Unit tests (vitest), E2E visual comparison, baseline-driven shape/SmartArt evaluation, two-layer metric system
-- [Performance](PERFORMANCE.md) — Windowed mounting, batch tuning, large-deck optimization
+- [Architecture](ARCHITECTURE.md) — Three-layer pipeline (Parse -> Model -> Render), search/highlight API boundaries, DOM construction strategy
+- [Testing](TESTING.md) — Unit tests (vitest), E2E visual comparison, dev-page model search and thumbnail navigation, two-layer metric system
+- [Performance](PERFORMANCE.md) — Windowed mounting, batch tuning, scaled preview guidance, large-deck optimization
 
 ## Quality & Process
 

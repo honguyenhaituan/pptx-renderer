@@ -168,11 +168,22 @@ await viewer.goToSlide(index);                           // Jump to slide (0-bas
 await viewer.goToSlide(index, { behavior: 'instant' }); // Custom ScrollIntoViewOptions (list mode)
 await viewer.setZoom(150);                               // Runtime zoom (10–400)
 await viewer.setFitMode('none');                         // Switch fit mode
+const matches = viewer.searchText('GPU');                 // Search parsed model text
+const hit = await viewer.highlightSearchResult(matches[0]); // Default node overlay highlight
+hit?.dispose();
+viewer.clearSearchHighlights();                          // Remove active search overlays
 
 // Render a single slide into an external container (React/Vue integration, thumbnails).
 // Returns a SlideHandle; caller owns it and must call handle.dispose() when done.
 const handle = viewer.renderSlideToContainer(index, container, scale?);
 handle.dispose();                                        // Clean up slide-specific resources
+
+// Render a lightweight scaled slide preview into an external container.
+// This preserves the original slide layout and uses transform scaling; it is
+// not a bitmap thumbnail generator, so use lazy/windowed mounting for decks.
+const thumb = viewer.renderThumbnailToContainer(index, sidebarItem, { width: 180 });
+await thumb?.ready;
+thumb?.dispose();
 
 // Query which slides are currently mounted in the DOM
 viewer.isSlideMounted(index);   // boolean
@@ -185,6 +196,83 @@ viewer.off('slidechange', listener);
 viewer.destroy();               // Cleanup blob URLs, observers, and DOM
 viewer[Symbol.dispose]();       // TC39 Explicit Resource Management (calls destroy)
 ```
+
+#### Text Search
+
+`PptxViewer.searchText(query, options?)` searches the parsed `PresentationData` model,
+not the rendered DOM. This keeps search available before or after a slide is mounted and
+avoids mutating renderer-generated text runs.
+
+String queries are case-insensitive by default. Pass `matchCase: true` when you need
+exact casing. RegExp queries keep their own flags, so `/GPU/` remains case-sensitive
+and `/GPU/i` remains case-insensitive.
+
+```ts
+import type { TextSearchResult } from '@aiden0z/pptx-renderer';
+
+const matches: TextSearchResult[] = viewer.searchText('GPU', {
+  matchCase: false,
+  wholeWord: true,
+  snippetRadius: 48,
+});
+
+const exactMatches = viewer.searchText('GPU', { matchCase: true });
+const regexMatches = viewer.searchText(/GPU|CPU/i);
+
+for (const match of matches) {
+  await viewer.goToSlide(match.slideIndex, { behavior: 'smooth', block: 'center' });
+  // Use match.bounds for node-level highlight overlays in your own UI.
+}
+```
+
+Each `TextSearchResult` includes `slideIndex`, `nodeId`, `nodePath`, `nodeType`,
+`textKind`, full `text`, `matchStart`, `matchEnd`, `snippet`, and `bounds`.
+`bounds` is the matched shape or table bounds in intrinsic slide coordinates, so
+application code can draw node-level highlight overlays on top of a rendered slide.
+
+The renderer intentionally does not rewrite text nodes for character-level text highlighting.
+Character-level text highlighting would require mapping match offsets back to shaped Office
+text runs and line layout, which is a separate, higher-risk renderer feature. Today the
+stable API boundary is model-level search plus node-level bounds.
+
+For the common UI case, `highlightSearchResult(result, options?)` draws a node-level
+overlay using a default highlight style. Pass `SearchHighlightOptions` for custom colors,
+spacing, shadows, and class names:
+
+```ts
+const hit = await viewer.highlightSearchResult(matches[0], {
+  className: 'my-search-hit',
+  borderColor: '#22c55e',
+  backgroundColor: 'rgba(34, 197, 94, 0.18)',
+  borderRadius: 6,
+  borderWidth: 2,
+  boxShadow: '0 0 0 2px rgba(15, 23, 42, 0.35)',
+  padding: 3,
+});
+
+// The caller owns returned highlight handles.
+hit?.dispose();
+viewer.clearSearchHighlights();
+```
+
+#### Scaled Slide Previews
+
+`PptxViewer.renderThumbnailToContainer(index, container, options?)` renders a slide at
+its intrinsic layout size and applies CSS transform scaling inside a clipped wrapper.
+This avoids the layout drift that can happen if a PPTX slide is rendered directly into a
+small thumbnail-sized container.
+
+```ts
+const thumb = viewer.renderThumbnailToContainer(slideIndex, thumbnailEl, { width: 96 });
+await thumb?.ready;
+
+// The caller owns externally rendered previews.
+thumb?.dispose();
+```
+
+This is not a bitmap thumbnail generator: it still creates a scaled DOM/SVG slide
+preview, so large decks should mount previews lazily with `IntersectionObserver` or a
+windowed list and dispose handles when they scroll out of view.
 
 #### `ListRenderOptions`
 
@@ -267,12 +355,18 @@ import {
   parseZip,
   buildPresentation,
   serializePresentation,
+  buildTextIndex,
+  searchText,
+  searchPresentation,
   RECOMMENDED_ZIP_LIMITS,
 } from '@aiden0z/pptx-renderer';
 
 const files = await parseZip(arrayBuffer, RECOMMENDED_ZIP_LIMITS); // PptxFiles
 const presentation = buildPresentation(files); // PresentationData
 const json = serializePresentation(presentation); // SerializedPresentation (JSON-safe)
+const index = buildTextIndex(presentation); // TextIndexEntry[]
+const matches = searchText(index, '算力'); // TextSearchResult[]
+const directMatches = searchPresentation(presentation, /GPU|CPU/i); // TextSearchResult[]
 ```
 
 #### Headless Slide Rendering
@@ -328,10 +422,18 @@ import type {
   PreviewInput,
   ViewerOptions,
   ListRenderOptions,
+  ThumbnailRenderOptions,
+  SearchHighlightHandle,
+  SearchHighlightOptions,
   PptxViewerEventMap,
   SlideHandle,
   PdfjsOptions,
   PdfjsConfig,
+  TextBounds,
+  TextIndexEntry,
+  TextIndexOptions,
+  TextSearchOptions,
+  TextSearchResult,
 } from '@aiden0z/pptx-renderer';
 ```
 

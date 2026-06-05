@@ -8,8 +8,216 @@
     <style>
       #pptx-container {
         padding: 24px;
-        max-width: 1200px;
+        min-width: 0;
+        flex: 1;
         margin: 0 auto;
+      }
+      .workspace {
+        display: flex;
+        align-items: flex-start;
+        gap: 18px;
+        max-width: 1440px;
+        margin: 0 auto;
+      }
+      .side-panel {
+        position: sticky;
+        top: 16px;
+        width: 188px;
+        max-height: calc(100vh - 32px);
+        padding: 16px;
+        overflow: hidden;
+        border-right: 1px solid var(--border);
+        background: var(--bg-surface);
+        flex: 0 0 auto;
+      }
+      .search-box {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 14px;
+      }
+      .search-query-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .search-box input {
+        width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 9px 10px;
+        color: #e8e8f0;
+        background: var(--bg-raised);
+        font-size: 13px;
+      }
+      .search-match-case-toggle input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+      }
+      .search-match-case-toggle span {
+        width: 34px;
+        height: 34px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--bg-raised);
+        color: #e8e8f0;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .search-match-case-toggle input:checked + span {
+        border-color: var(--accent);
+        background: var(--accent-glow);
+        color: #fff;
+      }
+      .search-match-case-toggle input:disabled + span {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+      .panel-title,
+      .search-summary {
+        font-size: 11px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        font-weight: 700;
+      }
+      .search-controls {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .search-controls button {
+        width: 30px;
+        height: 28px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--bg-raised);
+        color: #e8e8f0;
+        cursor: pointer;
+        font-size: 14px;
+        line-height: 1;
+      }
+      .search-controls button:hover:not(:disabled) {
+        border-color: var(--accent);
+      }
+      .search-controls button:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+      .search-position {
+        min-width: 58px;
+        color: var(--text-muted);
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+        text-align: center;
+      }
+      .search-results {
+        max-height: 160px;
+        overflow: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 14px;
+      }
+      .search-result {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--bg-raised);
+        color: #e8e8f0;
+        text-align: left;
+        padding: 8px;
+        cursor: pointer;
+        font-size: 12px;
+      }
+      .search-result:hover,
+      .search-result.active {
+        border-color: var(--accent);
+      }
+      .search-result.active {
+        background: rgba(233, 69, 96, 0.12);
+        box-shadow: inset 3px 0 0 var(--accent);
+      }
+      .search-result small {
+        display: block;
+        color: var(--text-muted);
+        margin-bottom: 4px;
+      }
+      .search-result mark {
+        border-radius: 3px;
+        background: rgba(255, 214, 102, 0.95);
+        color: #111122;
+        padding: 0 2px;
+      }
+      .thumbnail-list {
+        max-height: calc(100vh - 340px);
+        min-height: 220px;
+        overflow: auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        padding-right: 4px;
+      }
+      .thumbnail-item {
+        width: 112px;
+        min-width: 112px;
+        max-width: 112px;
+        box-sizing: border-box;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--bg-raised);
+        padding: 6px;
+        cursor: pointer;
+        color: #e8e8f0;
+        text-align: left;
+      }
+      .thumbnail-item:hover {
+        border-color: var(--accent);
+      }
+      .thumbnail-item.active {
+        background: rgba(233, 69, 96, 0.12);
+        box-shadow: inset 0 0 0 2px var(--accent);
+      }
+      .thumbnail-label {
+        display: block;
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-bottom: 4px;
+      }
+      .thumbnail-frame {
+        width: 96px;
+        height: 54px;
+        margin: 0 auto;
+        overflow: hidden;
+        background: #fff;
+        border-radius: 4px;
+      }
+      .search-highlight-overlay {
+        position: absolute;
+        z-index: 10000;
+        pointer-events: none;
+        border: 3px solid rgba(255, 214, 102, 0.95);
+        border-radius: 6px;
+        background: rgba(255, 214, 102, 0.16);
+        box-shadow: 0 0 0 2px rgba(17, 17, 34, 0.45);
+      }
+      .thumbnail-placeholder {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #667085;
+        background: #f4f6f8;
+        font-size: 10px;
       }
       .stats {
         font-size: 12px;
@@ -21,6 +229,28 @@
       }
       .stats span {
         white-space: nowrap;
+      }
+      @media (max-width: 860px) {
+        .workspace {
+          display: block;
+        }
+        .side-panel {
+          position: relative;
+          top: auto;
+          width: auto;
+          max-height: none;
+          border-right: 0;
+          border-bottom: 1px solid var(--border);
+        }
+        .thumbnail-list {
+          max-height: none;
+          flex-direction: row;
+          overflow-x: auto;
+          overflow-y: hidden;
+        }
+        .thumbnail-item {
+          min-width: 112px;
+        }
       }
     </style>
   </head>
@@ -45,10 +275,33 @@
       </div>
     </div>
     <div class="error-banner" id="error-banner"></div>
-    <div id="pptx-container">
-      <div class="empty-state">
-        <p>Upload a .pptx file to preview</p>
-        <small>Supports PowerPoint 2007+ format</small>
+    <div class="workspace">
+      <aside class="side-panel">
+        <div class="search-box">
+          <label class="panel-title" for="search-input">Search</label>
+          <div class="search-query-row">
+            <input id="search-input" type="search" placeholder="Find text in slides" disabled />
+            <label class="search-match-case-toggle" title="Match case">
+              <input id="search-match-case" type="checkbox" disabled />
+              <span>Aa</span>
+            </label>
+          </div>
+          <div class="search-summary" id="search-summary">No deck loaded</div>
+          <div class="search-controls">
+            <button id="search-prev" type="button" title="Previous result" disabled>&#8593;</button>
+            <span class="search-position" id="search-position">0 / 0</span>
+            <button id="search-next" type="button" title="Next result" disabled>&#8595;</button>
+          </div>
+        </div>
+        <div class="search-results" id="search-results"></div>
+        <div class="panel-title">Thumbnails</div>
+        <div class="thumbnail-list" id="thumbnail-list"></div>
+      </aside>
+      <div id="pptx-container">
+        <div class="empty-state">
+          <p>Upload a .pptx file to preview</p>
+          <small>Supports PowerPoint 2007+ format</small>
+        </div>
       </div>
     </div>
 
@@ -66,8 +319,22 @@
       const errorBanner = document.getElementById('error-banner');
       const slideCountEl = document.getElementById('slide-count');
       const renderTimeEl = document.getElementById('render-time');
+      const searchInput = document.getElementById('search-input');
+      const searchSummary = document.getElementById('search-summary');
+      const searchResultsEl = document.getElementById('search-results');
+      const searchPrev = document.getElementById('search-prev');
+      const searchNext = document.getElementById('search-next');
+      const searchPosition = document.getElementById('search-position');
+      const searchMatchCase = document.getElementById('search-match-case');
+      const thumbnailList = document.getElementById('thumbnail-list');
 
       let viewer = null;
+      let thumbnailObserver = null;
+      let searchMatches = [];
+      let activeSearchIndex = -1;
+      let activeSearchHighlight = null;
+      let searchHighlightTimer = 0;
+      const thumbnailHandles = new Map();
       const params = new URLSearchParams(location.search);
       const listStrategyParam = params.get('listStrategy');
       const listBatchSizeParam = Number(params.get('listBatchSize'));
@@ -82,9 +349,13 @@
 
         showError('');
         container.innerHTML = '<div class="empty-state"><p>Loading...</p></div>';
+        resetSidePanel();
 
         try {
-          if (viewer) viewer.destroy();
+          if (viewer) {
+            cleanupThumbnails();
+            viewer.destroy();
+          }
           const listOptions = {};
           if (listStrategyParam === 'windowed') {
             listOptions.windowed = true;
@@ -118,6 +389,21 @@
           const elapsed = performance.now() - start;
           slideCountEl.textContent = `${viewer.slideCount} slides`;
           renderTimeEl.textContent = `${elapsed.toFixed(0)}ms`;
+          searchInput.disabled = false;
+          searchMatchCase.disabled = false;
+          searchMatchCase.checked = false;
+          searchInput.value = '';
+          searchSummary.textContent = 'Ready';
+          setupThumbnails();
+          viewer.on('slidechange', (event) => {
+            markActiveThumbnail(event.detail.index);
+            const activeResult = searchMatches[activeSearchIndex];
+            if (activeResult && activeResult.slideIndex === event.detail.index) {
+              scheduleActiveSearchHighlight(activeResult);
+            } else {
+              resetActiveSearchOverlay();
+            }
+          });
         } catch (e) {
           console.error('Render failed:', e);
           showError(`Render failed: ${e.message || e}`);
@@ -129,6 +415,231 @@
         errorBanner.textContent = msg;
         errorBanner.style.display = msg ? 'block' : 'none';
       }
+
+      function resetSidePanel() {
+        cleanupThumbnails();
+        resetActiveSearchOverlay();
+        searchMatches = [];
+        activeSearchIndex = -1;
+        searchInput.disabled = true;
+        searchMatchCase.disabled = true;
+        searchMatchCase.checked = false;
+        searchInput.value = '';
+        searchSummary.textContent = 'No deck loaded';
+        updateSearchControls();
+        searchResultsEl.innerHTML = '';
+        thumbnailList.innerHTML = '';
+      }
+
+      function cleanupThumbnails() {
+        if (thumbnailObserver) {
+          thumbnailObserver.disconnect();
+          thumbnailObserver = null;
+        }
+        for (const handle of thumbnailHandles.values()) {
+          handle.dispose();
+        }
+        thumbnailHandles.clear();
+      }
+
+      function setupThumbnails() {
+        cleanupThumbnails();
+        thumbnailList.innerHTML = '';
+        if (!viewer) return;
+
+        thumbnailObserver = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              const frame = entry.target;
+              const item = frame.closest('.thumbnail-item');
+              const index = Number(item?.dataset.slideIndex ?? '-1');
+              if (!Number.isInteger(index) || index < 0) continue;
+              if (entry.isIntersecting) {
+                mountThumbnail(index, frame);
+              } else {
+                unmountThumbnail(index, frame);
+              }
+            }
+          },
+          { root: thumbnailList, rootMargin: '180px 0px', threshold: 0 },
+        );
+
+        for (let i = 0; i < viewer.slideCount; i++) {
+          const item = document.createElement('button');
+          item.type = 'button';
+          item.className = 'thumbnail-item';
+          item.dataset.slideIndex = String(i);
+          item.addEventListener('click', () => viewer.goToSlide(i, { behavior: 'smooth' }));
+
+          const label = document.createElement('span');
+          label.className = 'thumbnail-label';
+          label.textContent = `Slide ${i + 1}`;
+
+          const frame = document.createElement('div');
+          frame.className = 'thumbnail-frame';
+          frame.innerHTML = '<div class="thumbnail-placeholder">Pending</div>';
+
+          item.append(label, frame);
+          thumbnailList.appendChild(item);
+          thumbnailObserver.observe(frame);
+        }
+        markActiveThumbnail(viewer.currentSlideIndex);
+      }
+
+      function mountThumbnail(index, frame) {
+        if (!viewer || thumbnailHandles.has(index)) return;
+        frame.innerHTML = '';
+        const handle = viewer.renderThumbnailToContainer(index, frame, { width: 96 });
+        if (!handle) {
+          frame.innerHTML = '<div class="thumbnail-placeholder">Error</div>';
+          return;
+        }
+        thumbnailHandles.set(index, handle);
+        handle.ready.catch(() => {
+          frame.innerHTML = '<div class="thumbnail-placeholder">Error</div>';
+        });
+      }
+
+      function unmountThumbnail(index, frame) {
+        const handle = thumbnailHandles.get(index);
+        if (!handle) return;
+        handle.dispose();
+        thumbnailHandles.delete(index);
+        frame.innerHTML = '<div class="thumbnail-placeholder">Pending</div>';
+      }
+
+      function markActiveThumbnail(index) {
+        for (const item of thumbnailList.querySelectorAll('.thumbnail-item')) {
+          item.classList.toggle('active', Number(item.dataset.slideIndex) === index);
+        }
+      }
+
+      function normalizeSnippetText(text) {
+        return text.split(/\s+/).filter(Boolean).join(' ');
+      }
+
+      function renderHighlightedSnippet(result) {
+        const radius = 42;
+        const from = Math.max(0, result.matchStart - radius);
+        const to = Math.min(result.text.length, result.matchEnd + radius);
+        const snippet = document.createElement('span');
+        if (from > 0) snippet.append(document.createTextNode('...'));
+
+        const before = normalizeSnippetText(result.text.slice(from, result.matchStart));
+        if (before) snippet.append(document.createTextNode(before + ' '));
+
+        const mark = document.createElement('mark');
+        mark.textContent = result.text.slice(result.matchStart, result.matchEnd);
+        snippet.append(mark);
+
+        const after = normalizeSnippetText(result.text.slice(result.matchEnd, to));
+        if (after) snippet.append(document.createTextNode(' ' + after));
+        if (to < result.text.length) snippet.append(document.createTextNode('...'));
+        return snippet;
+      }
+
+      function updateSearchControls() {
+        const hasMatches = searchMatches.length > 0;
+        searchPrev.disabled = !hasMatches;
+        searchNext.disabled = !hasMatches;
+        searchPosition.textContent = hasMatches
+          ? `${activeSearchIndex + 1} / ${searchMatches.length}`
+          : `0 / ${searchMatches.length}`;
+      }
+
+      function renderSearchResults() {
+        searchResultsEl.innerHTML = '';
+        for (const [index, result] of searchMatches.entries()) {
+          const item = document.createElement('button');
+          item.type = 'button';
+          item.className = 'search-result';
+          item.dataset.searchIndex = String(index);
+          const slide = document.createElement('small');
+          slide.textContent = `Slide ${result.slideIndex + 1}`;
+          item.append(slide, renderHighlightedSnippet(result));
+          item.addEventListener('click', () => activateSearchResult(index));
+          searchResultsEl.appendChild(item);
+        }
+      }
+
+      function resetActiveSearchOverlay() {
+        if (searchHighlightTimer) {
+          window.clearTimeout(searchHighlightTimer);
+          searchHighlightTimer = 0;
+        }
+        activeSearchHighlight?.dispose();
+        activeSearchHighlight = null;
+        viewer?.clearSearchHighlights();
+      }
+
+      function scheduleActiveSearchHighlight(result, attempt = 0) {
+        if (searchHighlightTimer) window.clearTimeout(searchHighlightTimer);
+        searchHighlightTimer = window.setTimeout(
+          async () => {
+            searchHighlightTimer = 0;
+            if (!viewer) return;
+            viewer.clearSearchHighlights();
+            activeSearchHighlight = await viewer.highlightSearchResult(result, {
+              className: 'search-highlight-overlay',
+              scrollIntoView: false,
+            });
+            if (!activeSearchHighlight && attempt < 8) {
+              scheduleActiveSearchHighlight(result, attempt + 1);
+            }
+          },
+          attempt === 0 ? 80 : 140,
+        );
+      }
+
+      function activateSearchResult(index) {
+        if (!viewer || searchMatches.length === 0) return;
+        activeSearchIndex = (index + searchMatches.length) % searchMatches.length;
+        const result = searchMatches[activeSearchIndex];
+        for (const item of searchResultsEl.querySelectorAll('.search-result')) {
+          item.classList.toggle('active', Number(item.dataset.searchIndex) === activeSearchIndex);
+        }
+        updateSearchControls();
+        const activeItem = searchResultsEl.querySelector('.search-result.active');
+        activeItem?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        viewer.goToSlide(result.slideIndex, { behavior: 'smooth', block: 'center' });
+        scheduleActiveSearchHighlight(result);
+      }
+
+      function runSearch() {
+        if (!viewer) return;
+        const query = searchInput.value.trim();
+        if (!query) {
+          searchMatches = [];
+          activeSearchIndex = -1;
+          searchSummary.textContent = 'Ready';
+          searchResultsEl.innerHTML = '';
+          updateSearchControls();
+          resetActiveSearchOverlay();
+          return;
+        }
+
+        const allMatches = viewer.searchText(query, {
+          snippetRadius: 42,
+          matchCase: searchMatchCase.checked,
+        });
+        searchMatches = allMatches.slice(0, 50);
+        activeSearchIndex = searchMatches.length > 0 ? 0 : -1;
+        searchSummary.textContent = `${allMatches.length} match${allMatches.length === 1 ? '' : 'es'}${
+          allMatches.length > searchMatches.length ? ', first 50 shown' : ''
+        }`;
+        renderSearchResults();
+        updateSearchControls();
+        if (activeSearchIndex >= 0) {
+          activateSearchResult(activeSearchIndex);
+        } else {
+          resetActiveSearchOverlay();
+        }
+      }
+
+      searchInput.addEventListener('input', runSearch);
+      searchMatchCase.addEventListener('change', runSearch);
+      searchPrev.addEventListener('click', () => activateSearchResult(activeSearchIndex - 1));
+      searchNext.addEventListener('click', () => activateSearchResult(activeSearchIndex + 1));
 
       fileInput.addEventListener('change', (e) => {
         if (e.target.files[0]) handleFile(e.target.files[0]);

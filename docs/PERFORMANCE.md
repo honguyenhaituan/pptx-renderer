@@ -89,6 +89,33 @@ await PptxViewer.open(buffer, container, {
 - If `IntersectionObserver` is unavailable, windowed mode automatically falls back to full mounting.
 - A newer render request supersedes older queued or batched work. This keeps rapid calls such as `setZoom()`, `setFitMode()`, `renderList()`, and `renderSlide()` from continuing stale list batches after the next request has been queued.
 
+## Search and Preview UI
+
+`PptxViewer.searchText()` searches the parsed presentation model. Prefer it over DOM
+scanning for in-app search because it works before slides are mounted, avoids forcing
+windowed slides into the DOM, and returns stable node bounds for highlight overlays.
+
+`highlightSearchResult()` draws a node-level overlay on an existing rendered slide. It is
+cheap compared with full slide rendering, but callers should still dispose returned
+handles or call `clearSearchHighlights()` when changing active search results.
+
+`renderThumbnailToContainer()` is not a bitmap thumbnail generator. It renders real
+DOM/SVG slide content at the slide's intrinsic layout size and then scales that content
+inside a clipped preview wrapper. This avoids the layout drift caused by rendering a
+PowerPoint slide directly into a tiny container, but it still has the CPU, DOM, SVG,
+image, and chart cost of rendering a slide.
+
+For large decks:
+
+- Keep thumbnail containers small and fixed-size so selection state does not resize the
+  sidebar.
+- Mount previews lazily with `IntersectionObserver` or a virtual/windowed list.
+- Limit concurrent preview rendering; avoid eagerly rendering every slide preview on
+  initial load.
+- Dispose thumbnail `SlideHandle`s when previews leave the navigation surface.
+- Use model search results plus `highlightSearchResult()` for active hits instead of
+  re-rendering slides for every search step.
+
 ## E2E/Test Page Overrides
 
 Dev pages support URL overrides:

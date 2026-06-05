@@ -4,6 +4,9 @@ export type {
   ViewerOptions,
   FitMode,
   ListRenderOptions,
+  ThumbnailRenderOptions,
+  SearchHighlightHandle,
+  SearchHighlightOptions,
   PptxViewerEventMap,
   PreviewInput,
 } from './core/Viewer';
@@ -24,6 +27,17 @@ export type {
   SerializedSlide,
   SerializedNode,
 } from './export/serializePresentation';
+
+// Model-level text search
+export { buildTextIndex, searchPresentation, searchText } from './search/TextSearch';
+export type {
+  SearchTextKind,
+  TextBounds,
+  TextIndexEntry,
+  TextIndexOptions,
+  TextSearchOptions,
+  TextSearchResult,
+} from './search/TextSearch';
 
 // Headless single-slide rendering
 export { renderSlide } from './renderer/SlideRenderer';

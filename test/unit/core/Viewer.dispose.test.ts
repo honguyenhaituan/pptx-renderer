@@ -5,11 +5,19 @@ vi.mock('../../../src/renderer/SlideRenderer', () => ({
     const el = document.createElement('div');
     el.className = 'mock-slide';
     el.dataset.slideIndex = String(slide.index);
-    return { element: el, dispose: vi.fn(), [Symbol.dispose]() { this.dispose(); } };
+    return {
+      element: el,
+      ready: Promise.resolve(),
+      dispose: vi.fn(),
+      [Symbol.dispose]() {
+        this.dispose();
+      },
+    };
   }),
 }));
 
 import { PptxViewer } from '../../../src/core/Viewer';
+import { renderSlide } from '../../../src/renderer/SlideRenderer';
 import type { PresentationData } from '../../../src/model/Presentation';
 
 function makeMockPresentation(slideCount = 3): PresentationData {
@@ -235,5 +243,202 @@ describe('PptxViewer renderSlideToContainer', () => {
 
     viewer.renderSlideToContainer(0, container);
     expect(listener).toHaveBeenCalledOnce();
+  });
+});
+
+describe('PptxViewer text search and thumbnail preview', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('searchText returns structured matches and clears its cache on load()', () => {
+    const viewer = new PptxViewer(document.createElement('div'));
+
+    expect(viewer.searchText('gpu')).toEqual([]);
+
+    const first = makeMockPresentation(1);
+    first.slides[0].nodes = [
+      {
+        id: 'title',
+        name: 'Title',
+        nodeType: 'shape',
+        position: { x: 10, y: 20 },
+        size: { w: 200, h: 80 },
+        rotation: 0,
+        flipH: false,
+        flipV: false,
+        adjustments: new Map(),
+        textBody: { paragraphs: [{ level: 0, runs: [{ text: 'GPU capacity' }] }] },
+        source: {} as any,
+      } as any,
+    ];
+
+    viewer.load(first);
+    expect(viewer.searchText('gpu')).toMatchObject([
+      {
+        slideIndex: 0,
+        nodeId: 'title',
+        text: 'GPU capacity',
+        matchStart: 0,
+        matchEnd: 3,
+      },
+    ]);
+
+    viewer.load(makeMockPresentation(1));
+    expect(viewer.searchText('gpu')).toEqual([]);
+  });
+
+  it('renderThumbnailToContainer scales a full-size slide inside a clipped wrapper', () => {
+    const viewer = new PptxViewer(document.createElement('div'));
+    viewer.load(makeMockPresentation(1));
+    const container = document.createElement('div');
+
+    const handle = viewer.renderThumbnailToContainer(0, container, { width: 192 });
+
+    expect(handle).not.toBeNull();
+    expect(container.children[0]).toBe(handle!.element);
+    expect(handle!.element.style.width).toBe('192px');
+    expect(handle!.element.style.height).toBe('108px');
+    expect(handle!.element.style.overflow).toBe('hidden');
+    expect(handle!.element.querySelector('.mock-slide')).not.toBeNull();
+    expect(handle!.element.querySelector<HTMLElement>('.mock-slide')!.style.transform).toBe(
+      'scale(0.2)',
+    );
+  });
+
+  it('renderThumbnailToContainer disposes the underlying slide and removes the wrapper', () => {
+    const viewer = new PptxViewer(document.createElement('div'));
+    viewer.load(makeMockPresentation(1));
+    const container = document.createElement('div');
+
+    const handle = viewer.renderThumbnailToContainer(0, container, { width: 192 });
+    const slideHandle = vi.mocked(renderSlide).mock.results.at(-1)!.value;
+    handle!.dispose();
+
+    expect(slideHandle.dispose).toHaveBeenCalledOnce();
+    expect(container.children.length).toBe(0);
+  });
+
+  it('highlightSearchResult draws a default node-level overlay on the rendered slide', async () => {
+    const container = document.createElement('div');
+    const viewer = new PptxViewer(container);
+    const presentation = makeMockPresentation(1);
+    presentation.slides[0].nodes = [
+      {
+        id: 'title',
+        name: 'Title',
+        nodeType: 'shape',
+        position: { x: 10, y: 20 },
+        size: { w: 200, h: 80 },
+        rotation: 0,
+        flipH: false,
+        flipV: false,
+        adjustments: new Map(),
+        textBody: { paragraphs: [{ level: 0, runs: [{ text: 'GPU capacity' }] }] },
+        source: {} as any,
+      } as any,
+    ];
+
+    viewer.load(presentation);
+    await viewer.renderList();
+
+    const [result] = viewer.searchText('gpu');
+    const handle = await viewer.highlightSearchResult(result);
+
+    expect(handle).not.toBeNull();
+    expect(handle!.result).toBe(result);
+    expect(handle!.element.classList.contains('pptx-search-highlight')).toBe(true);
+    expect(handle!.element.dataset.pptxSearchHighlight).toBe('true');
+    expect(handle!.element.style.left).toBe('10px');
+    expect(handle!.element.style.top).toBe('20px');
+    expect(handle!.element.style.width).toBe('200px');
+    expect(handle!.element.style.height).toBe('80px');
+    expect(container.querySelectorAll('.pptx-search-highlight')).toHaveLength(1);
+  });
+
+  it('highlightSearchResult accepts custom visual styles and disposes the overlay', async () => {
+    const container = document.createElement('div');
+    const viewer = new PptxViewer(container);
+    const presentation = makeMockPresentation(1);
+    presentation.slides[0].nodes = [
+      {
+        id: 'title',
+        name: 'Title',
+        nodeType: 'shape',
+        position: { x: 10, y: 20 },
+        size: { w: 200, h: 80 },
+        rotation: 0,
+        flipH: false,
+        flipV: false,
+        adjustments: new Map(),
+        textBody: { paragraphs: [{ level: 0, runs: [{ text: 'GPU capacity' }] }] },
+        source: {} as any,
+      } as any,
+    ];
+
+    viewer.load(presentation);
+    await viewer.renderSlide(0);
+
+    const [result] = viewer.searchText('gpu');
+    const handle = await viewer.highlightSearchResult(result, {
+      className: 'custom-search-hit',
+      borderColor: 'lime',
+      backgroundColor: 'rgba(1, 2, 3, 0.4)',
+      borderRadius: 9,
+      borderWidth: 2,
+      boxShadow: '0 0 8px red',
+      padding: 3,
+      zIndex: 345,
+      style: { opacity: '0.8' },
+      scrollIntoView: false,
+    });
+
+    expect(handle).not.toBeNull();
+    expect(handle!.element.classList.contains('custom-search-hit')).toBe(true);
+    expect(handle!.element.style.left).toBe('7px');
+    expect(handle!.element.style.top).toBe('17px');
+    expect(handle!.element.style.width).toBe('206px');
+    expect(handle!.element.style.height).toBe('86px');
+    expect(handle!.element.style.backgroundColor).toBe('rgba(1, 2, 3, 0.4)');
+    expect(handle!.element.style.borderRadius).toBe('9px');
+    expect(handle!.element.style.borderWidth).toBe('2px');
+    expect(handle!.element.style.boxShadow).toBe('0 0 8px red');
+    expect(handle!.element.style.zIndex).toBe('345');
+    expect(handle!.element.style.opacity).toBe('0.8');
+
+    handle!.dispose();
+    expect(container.querySelectorAll('.pptx-search-highlight')).toHaveLength(0);
+  });
+
+  it('clearSearchHighlights removes all active search overlays', async () => {
+    const container = document.createElement('div');
+    const viewer = new PptxViewer(container);
+    const presentation = makeMockPresentation(1);
+    presentation.slides[0].nodes = [
+      {
+        id: 'title',
+        name: 'Title',
+        nodeType: 'shape',
+        position: { x: 10, y: 20 },
+        size: { w: 200, h: 80 },
+        rotation: 0,
+        flipH: false,
+        flipV: false,
+        adjustments: new Map(),
+        textBody: { paragraphs: [{ level: 0, runs: [{ text: 'GPU GPU' }] }] },
+        source: {} as any,
+      } as any,
+    ];
+
+    viewer.load(presentation);
+    await viewer.renderList();
+
+    const results = viewer.searchText('gpu');
+    await viewer.highlightSearchResult(results[0]);
+    await viewer.highlightSearchResult(results[1]);
+    expect(container.querySelectorAll('.pptx-search-highlight')).toHaveLength(2);
+
+    viewer.clearSearchHighlights();
+    expect(container.querySelectorAll('.pptx-search-highlight')).toHaveLength(0);
   });
 });

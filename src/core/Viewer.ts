@@ -4,6 +4,14 @@ import { buildPresentation, PresentationData } from '../model/Presentation';
 import { renderSlide as renderSlideInternal } from '../renderer/SlideRenderer';
 import type { SlideHandle } from '../renderer/SlideRenderer';
 import { isAllowedExternalUrl } from '../utils/urlSafety';
+import {
+  buildTextIndex,
+  searchText as searchTextInIndex,
+  type TextIndexEntry,
+  type TextIndexOptions,
+  type TextSearchOptions,
+  type TextSearchResult,
+} from '../search/TextSearch';
 import type { ECharts } from 'echarts';
 import type { PdfjsConfig } from '../utils/pdfRenderer';
 
@@ -47,6 +55,45 @@ export interface ListRenderOptions {
   showSlideLabels?: boolean;
 }
 
+export interface ThumbnailRenderOptions {
+  /** Target preview width in CSS pixels. Preserves the slide aspect ratio. */
+  width?: number;
+  /** Target preview height in CSS pixels. Preserves the slide aspect ratio. */
+  height?: number;
+  /** Explicit scale factor. Takes precedence over width/height when provided. */
+  scale?: number;
+}
+
+export interface SearchHighlightOptions {
+  /** Additional CSS class for application-specific styling. */
+  className?: string;
+  /** Border color for the highlight overlay. */
+  borderColor?: string;
+  /** Fill color for the highlight overlay. */
+  backgroundColor?: string;
+  /** CSS box-shadow for the highlight overlay. */
+  boxShadow?: string;
+  /** Overlay border radius. Numbers are treated as CSS pixels. */
+  borderRadius?: number | string;
+  /** Overlay border width. Numbers are treated as CSS pixels. */
+  borderWidth?: number | string;
+  /** Extra intrinsic-slide padding around the matched node bounds. */
+  padding?: number;
+  /** z-index applied to the overlay. */
+  zIndex?: number;
+  /** Additional inline CSS properties applied after the default/custom fields. */
+  style?: Record<string, string | number | undefined>;
+  /** Scroll or navigate to the result before drawing. Defaults to `true`. */
+  scrollIntoView?: boolean | ScrollIntoViewOptions;
+}
+
+export interface SearchHighlightHandle {
+  element: HTMLElement;
+  result: TextSearchResult;
+  dispose(): void;
+  [Symbol.dispose](): void;
+}
+
 export interface PptxViewerEventMap {
   renderstart: Event;
   rendercomplete: Event;
@@ -79,6 +126,8 @@ export class PptxViewer extends EventTarget {
   private lastMeasuredContainerWidth = 0;
   private mountedSlides = new Set<number>();
   private slideHandles = new Map<number, SlideHandle>();
+  private searchHighlightHandles = new Set<SearchHighlightHandle>();
+  private textIndexCache: { key: string; entries: TextIndexEntry[] } | null = null;
   private activeRenderMode: 'list' | 'slide' | null = null;
   private listOptions: Required<ListRenderOptions> = {
     windowed: false,
@@ -176,7 +225,9 @@ export class PptxViewer extends EventTarget {
    */
   load(presentation: PresentationData): void {
     this.renderGeneration++;
+    this.clearSearchHighlights();
     this.presentation = presentation;
+    this.textIndexCache = null;
     this.setupAdaptiveResize();
   }
 
@@ -299,7 +350,7 @@ export class PptxViewer extends EventTarget {
       const targetChild = this.container.querySelector<HTMLElement>(
         `[data-slide-index="${this.currentSlide}"]`,
       );
-      if (targetChild) {
+      if (targetChild && typeof targetChild.scrollIntoView === 'function') {
         targetChild.scrollIntoView(scrollOptions ?? { behavior: 'smooth', block: 'center' });
       }
     }
@@ -427,6 +478,132 @@ export class PptxViewer extends EventTarget {
   }
 
   /**
+   * Search loaded presentation text without depending on rendered DOM.
+   * Results point to slide/node locations that callers can use for navigation
+   * or custom highlighting.
+   */
+  searchText(
+    query: string | RegExp,
+    options?: TextSearchOptions & TextIndexOptions,
+  ): TextSearchResult[] {
+    if (!this.presentation) return [];
+    const index = this.getTextIndex(options);
+    return searchTextInIndex(index, query, options);
+  }
+
+  /**
+   * Render a scaled preview of a slide into an external container.
+   * The slide is still laid out at intrinsic size and then transformed, so this
+   * avoids thumbnail-only reflow differences.
+   */
+  renderThumbnailToContainer(
+    index: number,
+    container: HTMLElement,
+    options?: ThumbnailRenderOptions,
+  ): SlideHandle | null {
+    if (!this.presentation) return null;
+    const slide = this.presentation.slides[index];
+    if (!slide) return null;
+
+    const scale = this.getThumbnailScale(options);
+    const displayWidth = this.presentation.width * scale;
+    const displayHeight = this.presentation.height * scale;
+
+    const wrapper = document.createElement('div');
+    wrapper.dataset.slideIndex = String(index);
+    wrapper.dataset.pptxThumbnail = 'true';
+    wrapper.style.cssText = `
+      width: ${displayWidth}px;
+      height: ${displayHeight}px;
+      overflow: hidden;
+      position: relative;
+      background: #fff;
+      contain: layout paint style;
+    `;
+
+    container.appendChild(wrapper);
+    const slideHandle = this.renderSlideToContainer(index, wrapper, scale);
+    if (!slideHandle) {
+      wrapper.remove();
+      return null;
+    }
+
+    let disposed = false;
+    const dispose = (): void => {
+      if (disposed) return;
+      disposed = true;
+      slideHandle.dispose();
+      wrapper.remove();
+    };
+
+    return {
+      element: wrapper,
+      ready: slideHandle.ready,
+      dispose,
+      [Symbol.dispose](): void {
+        dispose();
+      },
+    };
+  }
+
+  /**
+   * Draw a node-level overlay for a text search result.
+   *
+   * The overlay uses result bounds in intrinsic slide coordinates and is
+   * transformed together with the rendered slide. It does not modify slide text.
+   */
+  async highlightSearchResult(
+    result: TextSearchResult,
+    options?: SearchHighlightOptions,
+  ): Promise<SearchHighlightHandle | null> {
+    if (!this.presentation) return null;
+    if (!this.presentation.slides[result.slideIndex]) return null;
+
+    await this.prepareSearchHighlightTarget(result.slideIndex, options);
+
+    const slideElement = this.findRenderedSlideElement(result.slideIndex);
+    if (!slideElement) return null;
+
+    if (getComputedStyle(slideElement).position === 'static') {
+      slideElement.style.position = 'relative';
+    }
+
+    const element = document.createElement('div');
+    element.className = 'pptx-search-highlight';
+    if (options?.className) {
+      element.classList.add(...options.className.split(/\s+/).filter(Boolean));
+    }
+    element.dataset.pptxSearchHighlight = 'true';
+    this.applySearchHighlightStyle(element, result, options);
+    slideElement.appendChild(element);
+
+    let disposed = false;
+    const handle: SearchHighlightHandle = {
+      element,
+      result,
+      dispose: () => {
+        if (disposed) return;
+        disposed = true;
+        element.remove();
+        this.searchHighlightHandles.delete(handle);
+      },
+      [Symbol.dispose](): void {
+        this.dispose();
+      },
+    };
+
+    this.searchHighlightHandles.add(handle);
+    return handle;
+  }
+
+  clearSearchHighlights(): void {
+    for (const handle of [...this.searchHighlightHandles]) {
+      handle.dispose();
+    }
+    this.searchHighlightHandles.clear();
+  }
+
+  /**
    * Hook called after rendering a single slide. Override in subclasses to
    * append additional UI (e.g. navigation buttons).
    */
@@ -441,6 +618,7 @@ export class PptxViewer extends EventTarget {
   destroy(): void {
     this.renderGeneration++;
     this._isRendering = false;
+    this.clearSearchHighlights();
     this.teardownAdaptiveResize();
     this.cleanupScrollObserver?.();
     this.cleanupScrollObserver = undefined;
@@ -452,6 +630,7 @@ export class PptxViewer extends EventTarget {
       handle.dispose();
     }
     this.slideHandles.clear();
+    this.textIndexCache = null;
     this.disposeAllCharts();
     for (const url of this.mediaUrlCache.values()) {
       URL.revokeObjectURL(url);
@@ -487,6 +666,113 @@ export class PptxViewer extends EventTarget {
     return Number.isFinite(val) && val > 0 ? val : fallback;
   }
 
+  private toCssLength(value: number | string | undefined, fallback: string): string {
+    if (value === undefined) return fallback;
+    return typeof value === 'number' ? `${value}px` : value;
+  }
+
+  private async prepareSearchHighlightTarget(
+    slideIndex: number,
+    options?: SearchHighlightOptions,
+  ): Promise<void> {
+    const scrollOption = options?.scrollIntoView;
+    if (scrollOption !== false) {
+      await this.goToSlide(
+        slideIndex,
+        typeof scrollOption === 'object' ? scrollOption : { behavior: 'smooth', block: 'center' },
+      );
+      return;
+    }
+
+    if (this.activeRenderMode === 'slide' && this.currentSlide !== slideIndex) {
+      await this.goToSlide(slideIndex);
+      return;
+    }
+
+    if (this.activeRenderMode === 'list') {
+      this.ensureListSlideMountedFn?.(slideIndex);
+    }
+  }
+
+  private findRenderedSlideElement(slideIndex: number): HTMLElement | null {
+    if (this.activeRenderMode === 'list') {
+      const item = this.container.querySelector<HTMLElement>(`[data-slide-index="${slideIndex}"]`);
+      const wrapper = item?.firstElementChild;
+      const slide = wrapper?.firstElementChild;
+      return slide instanceof HTMLElement ? slide : null;
+    }
+
+    const wrapper = this.container.firstElementChild;
+    const slide = wrapper?.firstElementChild;
+    return slide instanceof HTMLElement ? slide : null;
+  }
+
+  private applySearchHighlightStyle(
+    element: HTMLElement,
+    result: TextSearchResult,
+    options?: SearchHighlightOptions,
+  ): void {
+    const padding = Number.isFinite(options?.padding) ? Math.max(0, options!.padding!) : 0;
+    element.style.position = 'absolute';
+    element.style.pointerEvents = 'none';
+    element.style.boxSizing = 'border-box';
+    element.style.left = `${result.bounds.x - padding}px`;
+    element.style.top = `${result.bounds.y - padding}px`;
+    element.style.width = `${result.bounds.w + padding * 2}px`;
+    element.style.height = `${result.bounds.h + padding * 2}px`;
+    element.style.zIndex = String(options?.zIndex ?? 10000);
+    element.style.borderStyle = 'solid';
+    element.style.borderWidth = this.toCssLength(options?.borderWidth, '3px');
+    element.style.borderColor = options?.borderColor ?? 'rgba(255, 214, 102, 0.95)';
+    element.style.borderRadius = this.toCssLength(options?.borderRadius, '6px');
+    element.style.background = options?.backgroundColor ?? 'rgba(255, 214, 102, 0.16)';
+    element.style.boxShadow = options?.boxShadow ?? '0 0 0 2px rgba(17, 17, 34, 0.45)';
+
+    if (options?.style) {
+      for (const [property, value] of Object.entries(options.style)) {
+        if (value === undefined) continue;
+        element.style.setProperty(property, String(value));
+      }
+    }
+  }
+
+  private getTextIndex(options?: TextIndexOptions): TextIndexEntry[] {
+    const key = JSON.stringify({
+      includeShapes: options?.includeShapes ?? true,
+      includeTables: options?.includeTables ?? true,
+      includeGroups: options?.includeGroups ?? true,
+    });
+    if (this.textIndexCache?.key === key) {
+      return this.textIndexCache.entries;
+    }
+    const entries = this.presentation ? buildTextIndex(this.presentation, options) : [];
+    this.textIndexCache = { key, entries };
+    return entries;
+  }
+
+  private getThumbnailScale(options?: ThumbnailRenderOptions): number {
+    if (!this.presentation) return 1;
+    if (options?.scale !== undefined && Number.isFinite(options.scale) && options.scale > 0) {
+      return options.scale;
+    }
+
+    const widthScale =
+      options?.width !== undefined && Number.isFinite(options.width) && options.width > 0
+        ? options.width / this.presentation.width
+        : undefined;
+    const heightScale =
+      options?.height !== undefined && Number.isFinite(options.height) && options.height > 0
+        ? options.height / this.presentation.height
+        : undefined;
+
+    if (widthScale !== undefined && heightScale !== undefined) {
+      return Math.min(widthScale, heightScale);
+    }
+    if (widthScale !== undefined) return widthScale;
+    if (heightScale !== undefined) return heightScale;
+    return 180 / this.presentation.width;
+  }
+
   private getDisplayMetrics(): { scale: number; displayWidth: number; displayHeight: number } {
     if (!this.presentation) {
       return { scale: 1, displayWidth: 0, displayHeight: 0 };
@@ -520,6 +806,7 @@ export class PptxViewer extends EventTarget {
           this.cleanupListMount?.();
           this.cleanupListMount = undefined;
           this.ensureListSlideMountedFn = undefined;
+          this.clearSearchHighlights();
           this.mountedSlides.clear();
           for (const handle of this.slideHandles.values()) {
             handle.dispose();
