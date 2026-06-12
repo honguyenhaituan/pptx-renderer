@@ -5113,6 +5113,37 @@ describe('ChartRenderer', () => {
       expect(series.symbolSize).toBe(5);
     });
 
+    it('sizes filled radar charts like PowerPoint and uses stronger area fill (oracle-pypptx-chart-0019)', () => {
+      const xml = `<c:chartSpace
+        xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+        xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <c:chart>
+          <c:autoTitleDeleted val="0"/>
+          <c:plotArea>
+            <c:radarChart>
+              <c:radarStyle val="filled"/>
+              <c:ser>
+                <c:idx val="0"/><c:order val="0"/>
+                <c:tx><c:strRef><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>Student</c:v></c:pt></c:strCache></c:strRef></c:tx>
+                <c:cat><c:strRef><c:strCache><c:ptCount val="5"/><c:pt idx="0"><c:v>Math</c:v></c:pt><c:pt idx="1"><c:v>Science</c:v></c:pt><c:pt idx="2"><c:v>English</c:v></c:pt><c:pt idx="3"><c:v>History</c:v></c:pt><c:pt idx="4"><c:v>Art</c:v></c:pt></c:strCache></c:strRef></c:cat>
+                <c:val><c:numRef><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="5"/><c:pt idx="0"><c:v>92</c:v></c:pt><c:pt idx="1"><c:v>85</c:v></c:pt><c:pt idx="2"><c:v>78</c:v></c:pt><c:pt idx="3"><c:v>88</c:v></c:pt><c:pt idx="4"><c:v>95</c:v></c:pt></c:numCache></c:numRef></c:val>
+              </c:ser>
+              <c:axId val="1"/><c:axId val="2"/>
+            </c:radarChart>
+            <c:catAx><c:axId val="1"/><c:delete val="0"/><c:crossAx val="2"/></c:catAx>
+            <c:valAx><c:axId val="2"/><c:scaling/><c:delete val="0"/><c:crossAx val="1"/></c:valAx>
+          </c:plotArea>
+        </c:chart>
+      </c:chartSpace>`;
+
+      const { option } = parseChartOption(xml);
+      const radar = option.radar as any;
+      const radarSeries = (option.series as any[])[0];
+      expect(radar.radius).toBe('76%');
+      expect(radarSeries.data[0].areaStyle.opacity).toBe(0.75);
+      expect(radarSeries.data[0].symbol).toBe('none');
+    });
+
     it('applies major gridline line style from value axis spPr', () => {
       const xml = `<c:chartSpace
         xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"

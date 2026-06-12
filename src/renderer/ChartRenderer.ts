@@ -2574,6 +2574,7 @@ function buildRadarChartOption(
   const radarStyle = chartTypeNode.child('radarStyle').attr('val'); // 'marker' | 'filled' | undefined
   const radarHasTopLegend = legendIsAtTop(legendInfo) && !legendInfo?.overlay;
   const radarCenter: [string, string] = radarHasTopLegend ? ['50%', '66%'] : ['50%', '55%'];
+  const radarRadius = !radarHasTopLegend && radarStyle === 'filled' ? '76%' : '58%';
 
   const radarData = seriesArr.map((s) => {
     // Reorder values to match the reversed category order
@@ -2585,7 +2586,7 @@ function buildRadarChartOption(
     // PowerPoint radar charts fill the area with a semi-transparent version of the line color
     const isFilled = radarStyle === 'filled';
     const areaStyle = isFilled
-      ? { ...(s.colorHex ? { color: s.colorHex } : {}), opacity: 0.5 }
+      ? { ...(s.colorHex ? { color: s.colorHex } : {}), opacity: 0.75 }
       : undefined;
     return {
       name: s.name,
@@ -2605,6 +2606,7 @@ function buildRadarChartOption(
           }),
       ...(areaStyle ? { areaStyle } : {}),
       ...(echartsSymbol && echartsSymbol !== 'none' ? { symbol: echartsSymbol } : {}),
+      ...(!showSymbol ? { symbol: 'none' as const } : {}),
       ...(s.markerSize ? { symbolSize: s.markerSize } : {}),
       ...(showSymbol ? { symbolSize: s.markerSize ?? 6 } : {}),
     };
@@ -2635,7 +2637,7 @@ function buildRadarChartOption(
       }),
       legendTextStyle,
     ),
-    radar: { indicator, radius: '58%', center: radarCenter },
+    radar: { indicator, radius: radarRadius, center: radarCenter },
     series: [
       {
         type: 'radar' as const,
