@@ -97,6 +97,22 @@ function appendTransform(el: HTMLElement, transform: string): void {
   el.style.transform = `${el.style.transform || ''} ${transform}`.trim();
 }
 
+function expandCssLengthForScale(length: string, scale: number): string {
+  if (!(scale > 0)) return length;
+
+  const trimmed = length.trim();
+  if (!trimmed) return `${100 / scale}%`;
+
+  const match = trimmed.match(/^(-?\d*\.?\d+(?:e[-+]?\d+)?)([a-z%]*)$/i);
+  if (!match) return length;
+
+  const value = Number(match[1]);
+  if (!Number.isFinite(value)) return length;
+
+  const unit = match[2] || '%';
+  return `${value / scale}${unit}`;
+}
+
 function applyVerticalTextFlow(el: HTMLElement, anchor: string | null | undefined): void {
   el.style.writingMode = 'vertical-rl';
   el.style.justifyContent = 'center';
@@ -1456,20 +1472,10 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
       let needsDynamicAutofit = false;
       if (hasNormAutofit && normAutofit) {
         textContainer.style.overflowY = 'hidden';
-        const fontScale = normAutofit.numAttr('fontScale');
         const lnSpcReduction = normAutofit.numAttr('lnSpcReduction') ?? 0;
-        if (fontScale != null && fontScale < 100000) {
-          const scale = fontScale / 100000;
-          textContainer.style.transformOrigin = 'top left';
-          appendTransform(textContainer, `scale(${scale})`);
-          // Expand container dimensions so the scaled content fills the original space
-          textContainer.style.width = `${100 / scale}%`;
-          textContainer.style.height = `${100 / scale}%`;
-        } else if (fontScale == null) {
-          // fontScale not stored in XML — PowerPoint computes it at runtime.
-          // We'll measure after DOM insertion and apply dynamic scaling.
-          needsDynamicAutofit = true;
-        }
+        // renderTextBody applies normAutofit@fontScale to run and paragraph font sizes.
+        // The container transform is reserved for additional browser-measured shrink.
+        needsDynamicAutofit = true;
         if (lnSpcReduction > 0) {
           const lnFactor = 1 - lnSpcReduction / 100000;
           textContainer.style.lineHeight = `${lnFactor}`;
@@ -1628,8 +1634,8 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
       renderTextBody(node.textBody, node.placeholder, ctx, textContainer, textOptions);
       wrapper.appendChild(textContainer);
 
-      // Dynamic normAutofit: when fontScale is not stored in the XML, measure the
-      // rendered text and compute the needed scale so all text fits the container.
+      // Dynamic text fit: measure rendered text and compute any additional scale
+      // needed after OOXML fontScale, spAutoFit, or implicit single-line fitting.
       if (needsDynamicAutofit) {
         const baseTransform = textContainer.style.transform;
         const baseTransformOrigin = textContainer.style.transformOrigin;
@@ -1668,7 +1674,9 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
           const wrappedHeightFits =
             containerH > 0 &&
             (wrappedContentH <= containerH ||
-              (wrappedWidthFits && wrappedContentH <= containerH * wrappedHeightTolerance));
+              (!spAutoFitAllowsVerticalOverflow &&
+                wrappedWidthFits &&
+                wrappedContentH <= containerH * wrappedHeightTolerance));
           const wrappedFits =
             containerW > 0 && containerH > 0 && wrappedWidthFits && wrappedHeightFits;
           const shouldMeasureUnwrappedWidth =
@@ -1723,8 +1731,8 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
               textContainer.style.transformOrigin = 'top left';
             }
             appendTransform(textContainer, `scale(${scale})`);
-            textContainer.style.width = `${100 / scale}%`;
-            textContainer.style.height = `${100 / scale}%`;
+            textContainer.style.width = expandCssLengthForScale(baseWidth, scale);
+            textContainer.style.height = expandCssLengthForScale(baseHeight, scale);
           }
         };
 

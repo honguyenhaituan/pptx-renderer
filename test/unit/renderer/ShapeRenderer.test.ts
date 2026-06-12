@@ -362,7 +362,7 @@ describe('ShapeRenderer', () => {
     expect(stops[1]?.getAttribute('stop-color')).toBe(expectedEnd.color);
   });
 
-  it('uses inherited layout bodyPr normAutofit for text container scaling', () => {
+  it('uses inherited layout bodyPr normAutofit for text font sizing', () => {
     const xml = `
       <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
             xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
@@ -393,7 +393,111 @@ describe('ShapeRenderer', () => {
     ) as HTMLElement | undefined;
 
     expect(textContainer).toBeDefined();
-    expect(textContainer!.style.transform).toContain('scale(0.5)');
+    expect(textContainer!.style.transform).not.toContain('scale(');
+    const span = textContainer!.querySelector('span') as HTMLSpanElement | null;
+    expect(span?.style.fontSize).toBe('12pt');
+  });
+
+  it('uses explicit normAutofit fontScale as font sizing without pre-scaling textBoxBounds', () => {
+    const xml = `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr>
+          <p:cNvPr id="12" name="Diagram Text"/>
+          <p:cNvSpPr/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="1000000" cy="1000000"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr><a:normAutofit fontScale="50000"/></a:bodyPr>
+          <a:lstStyle/>
+          <a:p><a:r><a:rPr sz="2400"/><a:t>Bounded text</a:t></a:r></a:p>
+        </p:txBody>
+      </p:sp>
+    `;
+    const shapeNode = parseShapeNode(parseXml(xml));
+    shapeNode.textBoxBounds = { x: 8, y: 12, w: 120, h: 60 };
+
+    const el = renderShape(shapeNode, createMockRenderContext());
+    const textContainer = Array.from(el.querySelectorAll('div')).find((div) =>
+      div.textContent?.includes('Bounded text'),
+    ) as HTMLElement | undefined;
+
+    expect(textContainer).toBeDefined();
+    expect(textContainer!.style.left).toBe('8px');
+    expect(textContainer!.style.top).toBe('12px');
+    expect(textContainer!.style.transform).not.toContain('scale(');
+    expect(textContainer!.style.width).toBe('120px');
+    expect(textContainer!.style.height).toBe('60px');
+  });
+
+  it('applies only dynamic normAutofit transform after explicit fontScale sizing', () => {
+    const isFitContainer = (el: HTMLElement) =>
+      el.style.display === 'flex' && el.style.flexDirection === 'column';
+    const clientWidthSpy = vi
+      .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 100 : 0;
+      });
+    const clientHeightSpy = vi
+      .spyOn(HTMLElement.prototype, 'clientHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 100 : 0;
+      });
+    const scrollWidthSpy = vi
+      .spyOn(HTMLElement.prototype, 'scrollWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 200 : 0;
+      });
+    const scrollHeightSpy = vi
+      .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 100 : 0;
+      });
+
+    try {
+      const xml = `
+        <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+              xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <p:nvSpPr>
+            <p:cNvPr id="13" name="Scaled Autofit"/>
+            <p:cNvSpPr/>
+            <p:nvPr/>
+          </p:nvSpPr>
+          <p:spPr>
+            <a:xfrm><a:off x="0" y="0"/><a:ext cx="1000000" cy="1000000"/></a:xfrm>
+            <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          </p:spPr>
+          <p:txBody>
+            <a:bodyPr><a:normAutofit fontScale="50000"/></a:bodyPr>
+            <a:lstStyle/>
+            <a:p><a:r><a:rPr sz="2400"/><a:t>Scaled then measured</a:t></a:r></a:p>
+          </p:txBody>
+        </p:sp>
+      `;
+
+      const el = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+      const textContainer = Array.from(el.querySelectorAll('div')).find(
+        (div) =>
+          div.textContent?.includes('Scaled then measured') &&
+          div.style.flexDirection === 'column',
+      ) as HTMLElement | undefined;
+      const scaleCount = textContainer?.style.transform.match(/scale\(/g)?.length ?? 0;
+
+      expect(textContainer).toBeDefined();
+      expect(scaleCount).toBe(1);
+      expect(textContainer!.style.transform).toBe('scale(0.5)');
+      expect(textContainer!.style.width).toBe('200%');
+      expect(textContainer!.style.height).toBe('200%');
+    } finally {
+      clientWidthSpy.mockRestore();
+      clientHeightSpy.mockRestore();
+      scrollWidthSpy.mockRestore();
+      scrollHeightSpy.mockRestore();
+    }
   });
 
   it('preserves existing text transforms when dynamic autofit applies scale', () => {
@@ -435,6 +539,72 @@ describe('ShapeRenderer', () => {
       expect(textContainer!.style.transform).toContain('scale(0.5)');
     } finally {
       clientHeightSpy.mockRestore();
+      scrollHeightSpy.mockRestore();
+    }
+  });
+
+  it('preserves textBoxBounds pixel dimensions when dynamic spAutoFit shrinks text', () => {
+    const isFitContainer = (el: HTMLElement) =>
+      el.style.display === 'flex' && el.style.flexDirection === 'column';
+    const clientWidthSpy = vi
+      .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 120 : 0;
+      });
+    const clientHeightSpy = vi
+      .spyOn(HTMLElement.prototype, 'clientHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 60 : 0;
+      });
+    const scrollWidthSpy = vi
+      .spyOn(HTMLElement.prototype, 'scrollWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 240 : 0;
+      });
+    const scrollHeightSpy = vi
+      .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 60 : 0;
+      });
+
+    try {
+      const xml = `
+        <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+              xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <p:nvSpPr>
+            <p:cNvPr id="14" name="Diagram SpAutoFit"/>
+            <p:cNvSpPr/>
+            <p:nvPr/>
+          </p:nvSpPr>
+          <p:spPr>
+            <a:xfrm><a:off x="0" y="0"/><a:ext cx="1000000" cy="1000000"/></a:xfrm>
+            <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          </p:spPr>
+          <p:txBody>
+            <a:bodyPr><a:spAutoFit/></a:bodyPr>
+            <a:lstStyle/>
+            <a:p><a:r><a:rPr sz="2400"/><a:t>Measured bounded text</a:t></a:r></a:p>
+          </p:txBody>
+        </p:sp>
+      `;
+      const shapeNode = parseShapeNode(parseXml(xml));
+      shapeNode.textBoxBounds = { x: 4, y: 6, w: 120, h: 60 };
+
+      const el = renderShape(shapeNode, createMockRenderContext());
+      const textContainer = Array.from(el.querySelectorAll('div')).find(
+        (div) =>
+          div.textContent?.includes('Measured bounded text') &&
+          div.style.flexDirection === 'column',
+      ) as HTMLElement | undefined;
+
+      expect(textContainer).toBeDefined();
+      expect(textContainer!.style.transform).toContain('scale(0.5)');
+      expect(textContainer!.style.width).toBe('240px');
+      expect(textContainer!.style.height).toBe('120px');
+    } finally {
+      clientWidthSpy.mockRestore();
+      clientHeightSpy.mockRestore();
+      scrollWidthSpy.mockRestore();
       scrollHeightSpy.mockRestore();
     }
   });
@@ -3304,9 +3474,9 @@ describe('ShapeRenderer', () => {
     expect(el.style.cursor).not.toBe('pointer');
   });
 
-  // ---- normAutofit: static fontScale branch ----
+  // ---- normAutofit: fontScale sizing + dynamic measurement branch ----
 
-  it('normAutofit with explicit fontScale applies CSS transform scale to text container', () => {
+  it('normAutofit with explicit fontScale scales text fonts without a static container transform', () => {
     const xml = `
       <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
             xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
@@ -3319,7 +3489,7 @@ describe('ShapeRenderer', () => {
         <p:txBody>
           <a:bodyPr wrap="square"><a:normAutofit fontScale="60000" lnSpcReduction="10000"/></a:bodyPr>
           <a:lstStyle/>
-          <a:p><a:r><a:t>Shrink this text to fit the shape box.</a:t></a:r></a:p>
+          <a:p><a:r><a:rPr sz="2000"/><a:t>Shrink this text to fit the shape box.</a:t></a:r></a:p>
         </p:txBody>
       </p:sp>
     `;
@@ -3331,11 +3501,11 @@ describe('ShapeRenderer', () => {
     ) as HTMLDivElement | undefined;
 
     expect(textContainer).toBeTruthy();
-    // fontScale=60000 → scale(0.6)
-    expect(textContainer?.style.transform).toContain('scale(0.6)');
-    // Container dimensions must be expanded to 100/0.6 ≈ 166.67% so scaled content fills space
-    expect(textContainer?.style.width).toContain('%');
-    expect(textContainer?.style.height).toContain('%');
+    const span = textContainer?.querySelector('span') as HTMLSpanElement | undefined;
+    expect(span?.style.fontSize).toBe('12pt');
+    expect(textContainer?.style.transform ?? '').not.toContain('scale(');
+    expect(textContainer?.style.width).toBe('100%');
+    expect(textContainer?.style.height).toBe('100%');
     // Line spacing reduction should be applied
     expect(textContainer?.style.lineHeight).toBeTruthy();
     // Text should be clipped at container boundary
