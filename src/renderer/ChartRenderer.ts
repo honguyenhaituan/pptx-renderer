@@ -2257,9 +2257,13 @@ function buildLineChartOption(
     const echartsSymbol = mapOoxmlSymbol(markerSymbol);
     const showSymbol = echartsSymbol !== undefined ? echartsSymbol !== 'none' : undefined;
     const lineWidth = s.lineWidth ?? 3;
-    const lineStyle = s.colorHex
-      ? { color: s.colorHex, width: lineWidth, cap: 'round' as const, join: 'round' as const }
-      : { width: lineWidth, cap: 'round' as const, join: 'round' as const };
+    const lineStyle = {
+      ...(s.colorHex ? { color: s.colorHex } : {}),
+      width: lineWidth,
+      cap: 'round' as const,
+      join: 'round' as const,
+      ...(s.lineNoFill ? { opacity: 0 } : {}),
+    };
     const fc = s.formatCode;
     const perSeriesLabels =
       parseDataLabels(serNodesByOrder[idx] ?? chartTypeNode, ctx) ?? sharedLabels;
@@ -2628,11 +2632,17 @@ function buildRadarChartOption(
               width: s.lineWidth ?? 3,
               cap: 'round' as const,
               join: 'round' as const,
+              ...(s.lineNoFill ? { opacity: 0 } : {}),
             },
             itemStyle: { color: s.colorHex },
           }
         : {
-            lineStyle: { width: s.lineWidth ?? 3, cap: 'round' as const, join: 'round' as const },
+            lineStyle: {
+              width: s.lineWidth ?? 3,
+              cap: 'round' as const,
+              join: 'round' as const,
+              ...(s.lineNoFill ? { opacity: 0 } : {}),
+            },
           }),
       ...(areaStyle ? { areaStyle } : {}),
       ...(echartsSymbol && echartsSymbol !== 'none' ? { symbol: echartsSymbol } : {}),
@@ -2659,6 +2669,9 @@ function buildRadarChartOption(
       legendTopPx,
       seriesArr.map((s) => {
         const marker = mapOoxmlSymbol(s.markerSymbol);
+        if (s.lineNoFill && marker && marker !== 'none') {
+          return { name: s.name, icon: marker };
+        }
         return {
           name: s.name,
           icon: lineLegendIconPath(),

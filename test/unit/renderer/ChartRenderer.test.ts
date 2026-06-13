@@ -5318,6 +5318,73 @@ describe('ChartRenderer', () => {
       ]);
     });
 
+    it('renders lineChart series with noFill line as marker-only points', () => {
+      const xml = `<c:chartSpace
+        xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+        xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <c:chart>
+          <c:plotArea>
+            <c:lineChart>
+              <c:grouping val="standard"/>
+              <c:ser>
+                <c:idx val="0"/><c:order val="0"/>
+                <c:tx><c:strRef><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>Markers</c:v></c:pt></c:strCache></c:strRef></c:tx>
+                <c:spPr><a:ln w="38100"><a:noFill/></a:ln></c:spPr>
+                <c:marker><c:symbol val="circle"/><c:size val="6"/></c:marker>
+                <c:cat><c:strRef><c:strCache><c:ptCount val="3"/><c:pt idx="0"><c:v>Q1</c:v></c:pt><c:pt idx="1"><c:v>Q2</c:v></c:pt><c:pt idx="2"><c:v>Q3</c:v></c:pt></c:strCache></c:strRef></c:cat>
+                <c:val><c:numRef><c:numCache><c:formatCode>0</c:formatCode><c:ptCount val="3"/><c:pt idx="0"><c:v>10</c:v></c:pt><c:pt idx="1"><c:v>15</c:v></c:pt><c:pt idx="2"><c:v>12</c:v></c:pt></c:numCache></c:numRef></c:val>
+              </c:ser>
+              <c:axId val="1"/><c:axId val="2"/>
+            </c:lineChart>
+            <c:catAx><c:axId val="1"/><c:delete val="0"/><c:crossAx val="2"/></c:catAx>
+            <c:valAx><c:axId val="2"/><c:delete val="0"/><c:crossAx val="1"/></c:valAx>
+          </c:plotArea>
+        </c:chart>
+      </c:chartSpace>`;
+
+      const { option } = parseChartOption(xml);
+      const series = (option.series as any[])[0];
+      expect(series.type).toBe('line');
+      expect(series.symbol).toBe('circle');
+      expect(series.showSymbol).toBe(true);
+      expect(series.lineStyle.opacity).toBe(0);
+    });
+
+    it('renders radarChart series with noFill line as marker-only vertices', () => {
+      const xml = `<c:chartSpace
+        xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+        xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <c:chart>
+          <c:plotArea>
+            <c:radarChart>
+              <c:radarStyle val="marker"/>
+              <c:ser>
+                <c:idx val="0"/><c:order val="0"/>
+                <c:tx><c:strRef><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>Radar Markers</c:v></c:pt></c:strCache></c:strRef></c:tx>
+                <c:spPr><a:ln w="38100"><a:noFill/></a:ln></c:spPr>
+                <c:marker><c:symbol val="circle"/><c:size val="6"/></c:marker>
+                <c:cat><c:strRef><c:strCache><c:ptCount val="3"/><c:pt idx="0"><c:v>A</c:v></c:pt><c:pt idx="1"><c:v>B</c:v></c:pt><c:pt idx="2"><c:v>C</c:v></c:pt></c:strCache></c:strRef></c:cat>
+                <c:val><c:numRef><c:numCache><c:formatCode>0</c:formatCode><c:ptCount val="3"/><c:pt idx="0"><c:v>10</c:v></c:pt><c:pt idx="1"><c:v>15</c:v></c:pt><c:pt idx="2"><c:v>12</c:v></c:pt></c:numCache></c:numRef></c:val>
+              </c:ser>
+              <c:axId val="1"/><c:axId val="2"/>
+            </c:radarChart>
+            <c:catAx><c:axId val="1"/><c:delete val="0"/><c:crossAx val="2"/></c:catAx>
+            <c:valAx><c:axId val="2"/><c:delete val="0"/><c:crossAx val="1"/></c:valAx>
+          </c:plotArea>
+          <c:legend><c:legendPos val="t"/><c:overlay val="0"/></c:legend>
+        </c:chart>
+      </c:chartSpace>`;
+
+      const { option } = parseChartOption(xml);
+      const radarSeries = (option.series as any[])[0];
+      const item = radarSeries.data[0];
+      expect(item.symbol).toBe('circle');
+      expect(item.lineStyle.opacity).toBe(0);
+      const legend = option.legend as any;
+      expect(legend.icon).toBe('circle');
+      expect(legend.data[0]).toBe('Radar Markers');
+    });
+
     it('renders scatter lineMarker series with noFill line as unconnected markers (oracle-pypptx-chart-0016)', () => {
       const xml = `<c:chartSpace
         xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
