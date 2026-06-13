@@ -5205,6 +5205,63 @@ describe('ChartRenderer', () => {
       ]);
     });
 
+    it('renders scatter lineMarker series with noFill line as unconnected markers (oracle-pypptx-chart-0016)', () => {
+      const xml = `<c:chartSpace
+        xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+        xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <c:chart>
+          <c:plotArea>
+            <c:scatterChart>
+              <c:scatterStyle val="lineMarker"/>
+              <c:ser>
+                <c:idx val="0"/><c:order val="0"/>
+                <c:tx><c:strRef><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>Cluster A</c:v></c:pt></c:strCache></c:strRef></c:tx>
+                <c:spPr><a:ln w="47625"><a:noFill/></a:ln></c:spPr>
+                <c:xVal><c:numRef><c:numCache><c:ptCount val="5"/><c:pt idx="0"><c:v>1.2</c:v></c:pt><c:pt idx="1"><c:v>2.4</c:v></c:pt><c:pt idx="2"><c:v>3.1</c:v></c:pt><c:pt idx="3"><c:v>1.8</c:v></c:pt><c:pt idx="4"><c:v>2.9</c:v></c:pt></c:numCache></c:numRef></c:xVal>
+                <c:yVal><c:numRef><c:numCache><c:ptCount val="5"/><c:pt idx="0"><c:v>3.1</c:v></c:pt><c:pt idx="1"><c:v>4.2</c:v></c:pt><c:pt idx="2"><c:v>2.8</c:v></c:pt><c:pt idx="3"><c:v>3.6</c:v></c:pt><c:pt idx="4"><c:v>4.8</c:v></c:pt></c:numCache></c:numRef></c:yVal>
+                <c:smooth val="0"/>
+              </c:ser>
+              <c:ser>
+                <c:idx val="1"/><c:order val="1"/>
+                <c:tx><c:strRef><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>Cluster B</c:v></c:pt></c:strCache></c:strRef></c:tx>
+                <c:spPr><a:ln w="47625"><a:noFill/></a:ln></c:spPr>
+                <c:xVal><c:numRef><c:numCache><c:ptCount val="5"/><c:pt idx="0"><c:v>5.1</c:v></c:pt><c:pt idx="1"><c:v>6.3</c:v></c:pt><c:pt idx="2"><c:v>5.8</c:v></c:pt><c:pt idx="3"><c:v>7.1</c:v></c:pt><c:pt idx="4"><c:v>6.0</c:v></c:pt></c:numCache></c:numRef></c:xVal>
+                <c:yVal><c:numRef><c:numCache><c:ptCount val="5"/><c:pt idx="0"><c:v>1.2</c:v></c:pt><c:pt idx="1"><c:v>2.1</c:v></c:pt><c:pt idx="2"><c:v>1.8</c:v></c:pt><c:pt idx="3"><c:v>2.5</c:v></c:pt><c:pt idx="4"><c:v>0.9</c:v></c:pt></c:numCache></c:numRef></c:yVal>
+                <c:smooth val="0"/>
+              </c:ser>
+              <c:axId val="1"/><c:axId val="2"/>
+            </c:scatterChart>
+            <c:valAx><c:axId val="1"/><c:delete val="0"/><c:axPos val="b"/><c:crossAx val="2"/></c:valAx>
+            <c:valAx><c:axId val="2"/><c:delete val="0"/><c:axPos val="l"/><c:crossAx val="1"/></c:valAx>
+          </c:plotArea>
+        </c:chart>
+      </c:chartSpace>`;
+
+      const { option } = parseChartOption(xml);
+      const series = (option.series as any[])[0];
+      expect(series.type).toBe('scatter');
+      expect(series.data).toEqual([
+        [1.2, 3.1],
+        [2.4, 4.2],
+        [3.1, 2.8],
+        [1.8, 3.6],
+        [2.9, 4.8],
+      ]);
+      expect(series.lineStyle).toBeUndefined();
+      expect(series.symbol).toBe('diamond');
+
+      const secondSeries = (option.series as any[])[1];
+      expect(secondSeries.type).toBe('scatter');
+      expect(secondSeries.symbol).toBe('rect');
+
+      const xAxis = option.xAxis as any;
+      const yAxis = option.yAxis as any;
+      expect(xAxis.max).toBe(8);
+      expect(xAxis.interval).toBe(1);
+      expect(yAxis.max).toBe(6);
+      expect(yAxis.interval).toBe(1);
+    });
+
     it('sizes filled radar charts like PowerPoint and uses stronger area fill (oracle-pypptx-chart-0019)', () => {
       const xml = `<c:chartSpace
         xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"

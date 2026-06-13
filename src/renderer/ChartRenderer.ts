@@ -33,6 +33,7 @@ interface SeriesData {
   markerSize?: number; // OOXML c:marker > c:size val (points)
   smooth?: boolean; // OOXML c:smooth val for scatter/line-like charts
   lineWidth?: number; // c:spPr > a:ln@w converted to renderer px scale
+  lineNoFill?: boolean; // c:spPr > a:ln > a:noFill disables the series connector line
 }
 
 type ChartLineType = 'solid' | 'dashed' | 'dotted';
@@ -477,6 +478,10 @@ function extractSeriesLineWidth(ser: SafeXmlNode): number | undefined {
   return Math.max(1, Number((lnWidthEmu / 12700).toFixed(3)));
 }
 
+function extractSeriesLineNoFill(ser: SafeXmlNode): boolean {
+  return ser.child('spPr').child('ln').child('noFill').exists();
+}
+
 function toChartLineType(cssDash: string): ChartLineType {
   if (cssDash === 'dotted') return 'dotted';
   if (cssDash === 'dashed') return 'dashed';
@@ -832,6 +837,7 @@ function parseSeries(chartTypeNode: SafeXmlNode, ctx: RenderContext): SeriesData
 
     const colorHex = extractSeriesColor(ser, ctx);
     const lineWidth = extractSeriesLineWidth(ser);
+    const lineNoFill = extractSeriesLineNoFill(ser);
     const dataPointStyles = extractDataPointStyles(ser, ctx);
     const dataPointColors = dataPointStyles?.map((style) => style?.color);
     const invertIfNegativeNode = ser.child('invertIfNegative');
@@ -862,6 +868,7 @@ function parseSeries(chartTypeNode: SafeXmlNode, ctx: RenderContext): SeriesData
       markerSize,
       smooth,
       lineWidth,
+      lineNoFill,
     });
   }
 
@@ -1232,6 +1239,17 @@ const OOXML_SYMBOL_MAP: Record<string, string> = {
 function mapOoxmlSymbol(symbol: string | undefined): string | undefined {
   if (!symbol) return undefined;
   return OOXML_SYMBOL_MAP[symbol] ?? 'circle';
+}
+
+const DEFAULT_LINE_MARKER_SCATTER_SYMBOLS = ['diamond', 'rect', 'triangle', 'circle'];
+
+function defaultScatterSymbol(scatterStyle: string, seriesIndex: number): string {
+  if (scatterStyle === 'lineMarker' || scatterStyle === 'smoothMarker') {
+    return DEFAULT_LINE_MARKER_SCATTER_SYMBOLS[
+      seriesIndex % DEFAULT_LINE_MARKER_SCATTER_SYMBOLS.length
+    ];
+  }
+  return 'circle';
 }
 
 function buildLegendOption(
@@ -2668,9 +2686,6 @@ function buildScatterChartOption(
 
   // Parse scatter-specific marker defaults from scatterStyle
   const scatterStyle = chartTypeNode.child('scatterStyle').attr('val') ?? 'lineMarker';
-  // Default scatter marker symbol per OOXML: lineMarker → diamond, smoothMarker → diamond
-  const defaultScatterSymbol =
-    scatterStyle === 'lineMarker' || scatterStyle === 'smoothMarker' ? 'diamond' : 'circle';
   const scatterStyleDrawsLine =
     scatterStyle === 'lineMarker' ||
     scatterStyle === 'line' ||
@@ -2679,15 +2694,15 @@ function buildScatterChartOption(
   const scatterStyleIsSmooth = scatterStyle === 'smoothMarker' || scatterStyle === 'smooth';
   const scatterStyleHidesMarkers = scatterStyle === 'line' || scatterStyle === 'smooth';
 
-  const series = seriesArr.map((s) => {
+  const series = seriesArr.map((s, idx) => {
     // Use xValues if available (parsed from c:xVal), otherwise fall back to index
     const data = s.values.map((v, i) => {
       const x = s.xValues && i < s.xValues.length ? s.xValues[i] : i;
       return [x, v];
     });
-    const echartsSymbol = mapOoxmlSymbol(s.markerSymbol) ?? defaultScatterSymbol;
+    const echartsSymbol = mapOoxmlSymbol(s.markerSymbol) ?? defaultScatterSymbol(scatterStyle, idx);
     const showSymbol = !scatterStyleHidesMarkers && echartsSymbol !== 'none';
-    const renderAsLine = scatterStyleDrawsLine || s.smooth;
+    const renderAsLine = (scatterStyleDrawsLine || s.smooth) && !s.lineNoFill;
     if (renderAsLine) {
       const shouldInterpolate = s.smooth ?? scatterStyleIsSmooth;
       const lineData = shouldInterpolate ? buildSmoothScatterLineData(data) : data;
@@ -2716,15 +2731,15 @@ function buildScatterChartOption(
       type: 'scatter' as const,
       name: s.name,
       data,
-      symbol: echartsSymbol,
-      symbolSize: s.markerSize ?? 8,
+      symbol: showSymbol ? echartsSymbol : 'none',
+      symbolSize: showSymbol ? (s.markerSize ?? 8) : 0,
       itemStyle: s.colorHex ? { color: s.colorHex } : undefined,
     };
   });
-  const legendData = seriesArr.map((s) => {
-    const echartsSymbol = mapOoxmlSymbol(s.markerSymbol) ?? defaultScatterSymbol;
+  const legendData = seriesArr.map((s, idx) => {
+    const echartsSymbol = mapOoxmlSymbol(s.markerSymbol) ?? defaultScatterSymbol(scatterStyle, idx);
     const showSymbol = !scatterStyleHidesMarkers && echartsSymbol !== 'none';
-    const renderAsLine = scatterStyleDrawsLine || s.smooth;
+    const renderAsLine = (scatterStyleDrawsLine || s.smooth) && !s.lineNoFill;
     if (renderAsLine) {
       return showSymbol && echartsSymbol
         ? { name: s.name, icon: echartsSymbol }
@@ -3617,7 +3632,7 @@ function applyNiceAxisRange(option: echarts.EChartsOption): void {
     const interval = niceAxisInterval(dataMax, dataMin, desiredTicks);
     if (axis.max === undefined) {
       let max = niceAxisMax(dataMax, dataMin, desiredTicks);
-      if (max > dataMax && max - dataMax < interval * 0.05) {
+      if (max > dataMax && max - dataMax < interval * 0.25) {
         max += interval;
       }
       axis.max = max;
@@ -3630,11 +3645,19 @@ function applyNiceAxisRange(option: echarts.EChartsOption): void {
     }
   };
 
+  const scatterDesiredTicks = (values: number[]): number => {
+    if (values.length === 0) return 8;
+    const dataMin = Math.min(...values);
+    const dataMax = Math.max(...values);
+    const spanFromZero = dataMax - Math.min(0, dataMin);
+    return spanFromZero <= 3 ? 3 : 8;
+  };
+
   if (cartesianScatter) {
     const xAxes = (Array.isArray(opt.xAxis) ? opt.xAxis : [opt.xAxis]) as Record<string, unknown>[];
     const yAxes = (Array.isArray(opt.yAxis) ? opt.yAxis : [opt.yAxis]) as Record<string, unknown>[];
-    xAxes.forEach((ax) => applyAxisExtent(ax, xValues, 3));
-    yAxes.forEach((ax) => applyAxisExtent(ax, yValues, 8));
+    xAxes.forEach((ax) => applyAxisExtent(ax, xValues, scatterDesiredTicks(xValues)));
+    yAxes.forEach((ax) => applyAxisExtent(ax, yValues, scatterDesiredTicks(yValues)));
     return;
   }
 
