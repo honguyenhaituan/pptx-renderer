@@ -87,14 +87,8 @@ function getStyleSections(
     }
     return false;
   };
-  const bandRow =
-    tblPr?.attr('bandRow') === '1' ||
-    tblPr?.attr('bandRow') === 'true' ||
-    tblPr?.child('bandRow').exists();
-  const bandCol =
-    tblPr?.attr('bandCol') === '1' ||
-    tblPr?.attr('bandCol') === 'true' ||
-    tblPr?.child('bandCol').exists();
+  const bandRow = flag('bandRow', 'bandRow');
+  const bandCol = flag('bandCol', 'bandCol');
   const isFirstRow = flag('firstRow', 'firstRow');
   const isLastRow = flag('lastRow', 'lastRow');
   const isFirstCol = flag('firstCol', 'firstCol');

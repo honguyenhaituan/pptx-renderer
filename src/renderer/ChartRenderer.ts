@@ -921,12 +921,12 @@ function extractTitleText(title: SafeXmlNode): string | undefined {
 
 /**
  * Extract chart title from chartSpace > chart > title.
- * Returns undefined when autoTitleDeleted val="1" (title was intentionally removed).
+ * Returns undefined when autoTitleDeleted is true (title was intentionally removed).
  */
 function extractChartTitle(chartNode: SafeXmlNode, seriesArr?: SeriesData[]): string | undefined {
   // Respect autoTitleDeleted: if set, the title should not be shown
   const autoTitleDeleted = chartNode.child('autoTitleDeleted');
-  if (autoTitleDeleted.exists() && autoTitleDeleted.attr('val') === '1') {
+  if (parseOoxmlBoolElement(autoTitleDeleted)) {
     return undefined;
   }
 
@@ -936,7 +936,7 @@ function extractChartTitle(chartNode: SafeXmlNode, seriesArr?: SeriesData[]): st
     // Only synthesize the Office auto-title when the XML explicitly requests it.
     if (
       autoTitleDeleted.exists() &&
-      autoTitleDeleted.attr('val') === '0' &&
+      !parseOoxmlBoolElement(autoTitleDeleted) &&
       seriesArr &&
       seriesArr.length === 1 &&
       seriesArr[0].name
@@ -1069,7 +1069,7 @@ function extractLegendInfo(chartNode: SafeXmlNode, ctx: RenderContext): LegendIn
     ? (rawPosVal as LegendInfo['position'])
     : 'r';
 
-  const overlay = legend.child('overlay').attr('val') === '1';
+  const overlay = parseOoxmlBoolElement(legend.child('overlay'));
 
   // Map OOXML positions to ECharts; keep legend inside and below chart title (avoid overlap on slide 4, 6, etc.)
   const base = { confine: true as const };
@@ -1486,7 +1486,7 @@ function extractAxisTitle(
  */
 function parseAxisNode(ax: SafeXmlNode, ctx: RenderContext): AxisInfo {
   if (!ax.exists()) return { ...DEFAULT_AXIS_INFO };
-  const deleted = ax.child('delete').attr('val') === '1';
+  const deleted = parseOoxmlBoolElement(ax.child('delete'));
   const tickLblPos = ax.child('tickLblPos').attr('val') || 'nextTo';
   const crosses = ax.child('crosses').attr('val');
   const numFmtNode = ax.child('numFmt');
@@ -3627,7 +3627,7 @@ function applyLegendGridMargins(
 
   const legend = chartNode.child('legend');
   if (!legend.exists()) return;
-  const overlay = legend.child('overlay').attr('val') === '1';
+  const overlay = parseOoxmlBoolElement(legend.child('overlay'));
   if (overlay) return;
 
   const posVal = legend.child('legendPos').attr('val') || 'r';

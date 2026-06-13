@@ -1187,6 +1187,30 @@ describe('renderTable', () => {
       expect(tds[3].style.backgroundColor).toBe('rgb(204, 204, 204)');
     });
 
+    it('treats bandRow child with val="0" as disabled', () => {
+      const ctx = makeCtxWithTableStyle(`
+        <tblStyleLst>
+          <tblStyle styleId="{BANDROW_OFF}">
+            <wholeTbl><tcStyle><fill><solidFill><srgbClr val="AABBCC"/></solidFill></fill></tcStyle></wholeTbl>
+            <band1H><tcStyle><fill><solidFill><srgbClr val="EEEEEE"/></solidFill></fill></tcStyle></band1H>
+            <band2H><tcStyle><fill><solidFill><srgbClr val="CCCCCC"/></solidFill></fill></tcStyle></band2H>
+          </tblStyle>
+        </tblStyleLst>
+      `);
+      const tblPr = parseXml('<tblPr><bandRow val="0"/></tblPr>');
+      const rows: TableRow[] = [
+        { height: 50, cells: [{ gridSpan: 1, rowSpan: 1, hMerge: false, vMerge: false }] },
+        { height: 50, cells: [{ gridSpan: 1, rowSpan: 1, hMerge: false, vMerge: false }] },
+      ];
+      const el = renderTable(
+        makeTable({ columns: [400], rows, tableStyleId: '{BANDROW_OFF}', properties: tblPr }),
+        ctx,
+      );
+      const tds = el.querySelectorAll('td');
+      expect(tds[0].style.backgroundColor).toBe('rgb(170, 187, 204)');
+      expect(tds[1].style.backgroundColor).toBe('rgb(170, 187, 204)');
+    });
+
     it('applies band1V and band2V banding to alternating columns', () => {
       const ctx = makeCtxWithTableStyle(`
         <tblStyleLst>
@@ -1216,6 +1240,38 @@ describe('renderTable', () => {
       expect(tds[2].style.backgroundColor).toBe('rgb(221, 221, 221)');
       // Col 3 → odd → band2V
       expect(tds[3].style.backgroundColor).toBe('rgb(187, 187, 187)');
+    });
+
+    it('treats bandCol child with val="0" as disabled', () => {
+      const ctx = makeCtxWithTableStyle(`
+        <tblStyleLst>
+          <tblStyle styleId="{BANDCOL_OFF}">
+            <wholeTbl><tcStyle><fill><solidFill><srgbClr val="AABBCC"/></solidFill></fill></tcStyle></wholeTbl>
+            <band1V><tcStyle><fill><solidFill><srgbClr val="DDDDDD"/></solidFill></fill></tcStyle></band1V>
+            <band2V><tcStyle><fill><solidFill><srgbClr val="BBBBBB"/></solidFill></fill></tcStyle></band2V>
+          </tblStyle>
+        </tblStyleLst>
+      `);
+      const tblPr = parseXml('<tblPr><bandCol val="0"/></tblPr>');
+      const rows: TableRow[] = [{
+        height: 100,
+        cells: [
+          { gridSpan: 1, rowSpan: 1, hMerge: false, vMerge: false },
+          { gridSpan: 1, rowSpan: 1, hMerge: false, vMerge: false },
+        ],
+      }];
+      const el = renderTable(
+        makeTable({
+          columns: [200, 200],
+          rows,
+          tableStyleId: '{BANDCOL_OFF}',
+          properties: tblPr,
+        }),
+        ctx,
+      );
+      const tds = el.querySelectorAll('td');
+      expect(tds[0].style.backgroundColor).toBe('rgb(170, 187, 204)');
+      expect(tds[1].style.backgroundColor).toBe('rgb(170, 187, 204)');
     });
 
     // -----------------------------------------------------------------------
