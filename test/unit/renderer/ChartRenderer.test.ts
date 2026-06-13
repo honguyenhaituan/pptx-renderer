@@ -5111,7 +5111,7 @@ describe('ChartRenderer', () => {
       const series = (option.series as any[])[0];
       expect(series.showSymbol).toBe(true);
       expect(series.symbol).toBe('diamond');
-      expect(series.symbolSize).toBe(5);
+      expect(series.symbolSize).toBeCloseTo(6.667, 3);
     });
 
     it('does not infer a scatter chart title when autoTitleDeleted is omitted (oracle-pypptx-chart-0017)', () => {

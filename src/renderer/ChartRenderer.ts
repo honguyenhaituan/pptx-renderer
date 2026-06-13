@@ -6,7 +6,7 @@ import * as echarts from 'echarts';
 import { ChartNodeData } from '../model/nodes/ChartNode';
 import { RenderContext } from './RenderContext';
 import { SafeXmlNode } from '../parser/XmlParser';
-import { emuToPx } from '../parser/units';
+import { emuToPx, ptToPx } from '../parser/units';
 import { resolveColor, resolveLineStyle } from './StyleResolver';
 import { cssFontFamilyStack, resolveThemeFontStack } from './fontResolver';
 
@@ -30,7 +30,7 @@ interface SeriesData {
   formatCode?: string; // numCache formatCode (e.g. "0%", "0.0%", "General")
   invertIfNegative?: boolean; // c:invertIfNegative, defaults are chart-type dependent
   markerSymbol?: string; // OOXML c:marker > c:symbol val
-  markerSize?: number; // OOXML c:marker > c:size val (points)
+  markerSize?: number; // OOXML c:marker > c:size converted from points to px
   smooth?: boolean; // OOXML c:smooth val for scatter/line-like charts
   lineWidth?: number; // c:spPr > a:ln@w converted to renderer px scale
   lineNoFill?: boolean; // c:spPr > a:ln > a:noFill disables the series connector line
@@ -478,6 +478,10 @@ function extractSeriesLineWidth(ser: SafeXmlNode): number | undefined {
   return Math.max(1, Number((lnWidthEmu / 12700).toFixed(3)));
 }
 
+function markerSizeToPx(sizePt: number): number {
+  return Number(ptToPx(sizePt).toFixed(3));
+}
+
 function extractSeriesLineNoFill(ser: SafeXmlNode): boolean {
   return ser.child('spPr').child('ln').child('noFill').exists();
 }
@@ -848,7 +852,8 @@ function parseSeries(chartTypeNode: SafeXmlNode, ctx: RenderContext): SeriesData
     // Extract marker info (c:marker > c:symbol, c:size)
     const marker = ser.child('marker');
     const markerSymbol = marker.child('symbol').attr('val');
-    const markerSize = marker.child('size').numAttr('val');
+    const markerSizePt = marker.child('size').numAttr('val');
+    const markerSize = markerSizePt !== undefined ? markerSizeToPx(markerSizePt) : undefined;
     const smoothNode = ser.child('smooth');
     const smooth = smoothNode.exists() ? parseOoxmlBoolElement(smoothNode) : undefined;
 
@@ -2286,7 +2291,8 @@ function buildLineChartOption(
         : undefined;
     const symbolSize = forceSymbolForLabel
       ? 0
-      : (s.markerSize ?? (s.markerSymbol === undefined && chartMarker === true ? 5 : undefined));
+      : (s.markerSize ??
+        (s.markerSymbol === undefined && chartMarker === true ? markerSizeToPx(5) : undefined));
     const resolvedShowSymbol = forceSymbolForLabel
       ? true
       : isArea && echartsSymbol === undefined
