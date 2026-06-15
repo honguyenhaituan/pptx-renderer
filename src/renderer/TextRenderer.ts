@@ -865,6 +865,9 @@ export function renderTextBody(
     if (paragraph.runs.length > 0 && paragraph.runs[0].properties) {
       const sz = paragraph.runs[0].properties.numAttr('sz');
       if (sz !== undefined) effectiveFontSize = sz / 100;
+    } else if (paragraph.runs.length === 0 && paragraph.endParaRPr) {
+      const sz = paragraph.endParaRPr.numAttr('sz');
+      if (sz !== undefined) effectiveFontSize = sz / 100;
     }
     // Browser line boxes include a "strut" based on the block element's own font size.
     // Keep the paragraph block in sync with Office's effective run size so tiny

@@ -77,6 +77,11 @@ describe('getPresetShapePath', () => {
     expect(d).toContain('M');
   });
 
+  it('renders curvedConnector2 using OOXML preset control points (xcloud-intro slide 10)', () => {
+    const d = getPresetShapePath('curvedConnector2', 200, 100);
+    expect(d).toBe('M0,0 C100,0 200,50 200,100');
+  });
+
   it('handles adjustments', () => {
     const adjs = new Map([['adj', 25000]]);
     const d = getPresetShapePath('roundRect', 200, 100, adjs);

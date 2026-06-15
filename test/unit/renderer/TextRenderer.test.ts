@@ -1860,6 +1860,7 @@ describe('TextRenderer — renderTextBody', () => {
       });
       const container = renderToContainer(body);
       const paraDiv = container.children[0] as HTMLElement;
+      expect(paraDiv.style.fontSize).toBe('54pt');
       // The empty paragraph's br should use the endParaRPr font size
       const br = paraDiv.querySelector('br, span');
       // The br or spacer should exist

@@ -642,7 +642,7 @@ presetShapes.set('bentConnector4', (w, h, adjustments) => {
 });
 
 presetShapes.set('curvedConnector2', (w, h) => {
-  return `M0,0 C${w},0 0,${h} ${w},${h}`;
+  return `M0,0 C${w / 2},0 ${w},${h / 2} ${w},${h}`;
 });
 
 presetShapes.set('curvedConnector3', (w, h, adjustments) => {

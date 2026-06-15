@@ -168,6 +168,126 @@ describe('ShapeRenderer', () => {
     expect(marker?.getAttribute('refX')).toBe('10');
   });
 
+  it('keeps headEnd triangle arrow shape while insetting the connector start (xcloud-solution slide 45)', () => {
+    const xml = `
+      <p:cxnSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvCxnSpPr>
+          <p:cNvPr id="160" name="直接箭头连接符 946"/>
+          <p:cNvCxnSpPr/>
+          <p:nvPr/>
+        </p:nvCxnSpPr>
+        <p:spPr>
+          <a:xfrm flipV="1">
+            <a:off x="11355876" y="4274747"/>
+            <a:ext cx="0" cy="334899"/>
+          </a:xfrm>
+          <a:prstGeom prst="straightConnector1"><a:avLst/></a:prstGeom>
+          <a:noFill/>
+          <a:ln w="50800" cap="rnd">
+            <a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill>
+            <a:headEnd type="triangle"/>
+            <a:tailEnd type="none"/>
+          </a:ln>
+        </p:spPr>
+      </p:cxnSp>
+    `;
+
+    const shapeNode = parseShapeNode(parseXml(xml));
+    const el = renderShape(shapeNode, createMockRenderContext());
+    const path = el.querySelector('path');
+    const marker = el.querySelector('marker');
+    const polygon = marker?.querySelector('polygon');
+    const pathNumbers = extractPathNumbers(path?.getAttribute('d') ?? '');
+
+    expect(path).toBeTruthy();
+    expect(marker).toBeTruthy();
+    expect(polygon?.getAttribute('points')).toBe('0,5 10,0 10,10');
+    expect(marker?.getAttribute('refX')).toBe('10');
+    expect(Number.parseFloat(marker!.getAttribute('markerWidth') ?? '0')).toBeCloseTo(16, 3);
+    expect(Number.parseFloat(marker!.getAttribute('markerHeight') ?? '0')).toBeCloseTo(
+      13.333,
+      3,
+    );
+    expect(pathNumbers[1]).toBeCloseTo(16, 3);
+  });
+
+  it('keeps tailEnd marker visible when gradient stroke fades to transparent (xcloud-solution slide 45)', () => {
+    const xml = `
+      <p:cxnSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvCxnSpPr>
+          <p:cNvPr id="165" name="直接箭头连接符 942"/>
+          <p:cNvCxnSpPr/>
+          <p:nvPr/>
+        </p:nvCxnSpPr>
+        <p:spPr>
+          <a:xfrm>
+            <a:off x="11344710" y="5136329"/>
+            <a:ext cx="0" cy="379362"/>
+          </a:xfrm>
+          <a:prstGeom prst="straightConnector1"><a:avLst/></a:prstGeom>
+          <a:noFill/>
+          <a:ln w="50800" cap="rnd">
+            <a:gradFill>
+              <a:gsLst>
+                <a:gs pos="0"><a:schemeClr val="bg1"/></a:gs>
+                <a:gs pos="100000">
+                  <a:schemeClr val="bg1"><a:alpha val="0"/></a:schemeClr>
+                </a:gs>
+              </a:gsLst>
+              <a:lin ang="16200000" scaled="0"/>
+            </a:gradFill>
+            <a:tailEnd type="triangle"/>
+          </a:ln>
+        </p:spPr>
+      </p:cxnSp>
+    `;
+
+    const el = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+    const path = el.querySelector('path');
+    const markerPolygon = el.querySelector('defs marker polygon');
+
+    expect(path?.getAttribute('marker-end')).toContain('arrow-marker-');
+    expect(markerPolygon?.getAttribute('fill')).not.toMatch(/rgba\([^)]*,0(?:\.000)?\)/);
+    expect(path?.getAttribute('stroke-linecap')).toBe('butt');
+  });
+
+  it('insets curved connector headEnd start so the arrow tip stays anchored (xcloud-intro slide 10)', () => {
+    const xml = `
+      <p:cxnSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvCxnSpPr>
+          <p:cNvPr id="42" name="直接箭头连接符 10"/>
+          <p:cNvCxnSpPr/>
+          <p:nvPr/>
+        </p:nvCxnSpPr>
+        <p:spPr>
+          <a:xfrm flipV="1">
+            <a:off x="5488572" y="3127434"/>
+            <a:ext cx="610035" cy="402630"/>
+          </a:xfrm>
+          <a:prstGeom prst="curvedConnector2"><a:avLst/></a:prstGeom>
+          <a:noFill/>
+          <a:ln w="51435" cap="flat">
+            <a:solidFill><a:srgbClr val="FFFFFF"><a:alpha val="50000"/></a:srgbClr></a:solidFill>
+            <a:headEnd type="triangle"/>
+            <a:tailEnd type="triangle"/>
+          </a:ln>
+        </p:spPr>
+      </p:cxnSp>
+    `;
+
+    const el = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+    const path = el.querySelector('path');
+    const pathNumbers = extractPathNumbers(path?.getAttribute('d') ?? '');
+
+    expect(path?.getAttribute('marker-start')).toContain('arrow-marker-');
+    expect(path?.getAttribute('d')).toContain(' C');
+    expect(pathNumbers[0]).toBeGreaterThan(10);
+    expect(pathNumbers[1]).toBeGreaterThanOrEqual(0);
+  });
+
   it('renders lineInv using theme lnRef stroke when shape has no explicit <a:ln>', () => {
     const xml = `
       <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
@@ -848,6 +968,77 @@ describe('ShapeRenderer', () => {
     }
   });
 
+  it('does not auto-shrink long default-wrap paragraphs without autofit (xcloud-solution slide 17)', () => {
+    const isFitContainer = (el: HTMLElement) =>
+      el.style.display === 'flex' && el.style.flexDirection === 'column';
+    const clientWidthSpy = vi
+      .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 1131 : 0;
+      });
+    const clientHeightSpy = vi
+      .spyOn(HTMLElement.prototype, 'clientHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 68 : 0;
+      });
+    const scrollWidthSpy = vi
+      .spyOn(HTMLElement.prototype, 'scrollWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        if (!isFitContainer(this)) return 0;
+        return this.style.whiteSpace === 'nowrap' ? 2378 : 1131;
+      });
+    const scrollHeightSpy = vi
+      .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        if (!isFitContainer(this)) return 0;
+        return this.style.whiteSpace === 'nowrap' ? 68 : 80;
+      });
+
+    try {
+      const xml = `
+        <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+              xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <p:nvSpPr>
+            <p:cNvPr id="51" name="矩形 41"/>
+            <p:cNvSpPr/>
+            <p:nvPr/>
+          </p:nvSpPr>
+          <p:spPr>
+            <a:xfrm><a:off x="639924" y="927609"/><a:ext cx="10776767" cy="647082"/></a:xfrm>
+            <a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val 7818"/></a:avLst></a:prstGeom>
+          </p:spPr>
+          <p:txBody>
+            <a:bodyPr lIns="82275" tIns="41137" rIns="82275" bIns="41137" rtlCol="0" anchor="ctr"/>
+            <a:lstStyle/>
+            <a:p>
+              <a:pPr algn="just" defTabSz="1218199"><a:defRPr/></a:pPr>
+              <a:r>
+                <a:rPr lang="zh-CN" sz="1200"><a:latin typeface="Microsoft YaHei"/><a:ea typeface="Microsoft YaHei"/></a:rPr>
+                <a:t>提供企业知识资产全生命周期管理能力，包括知识采集、智能解析、多模态存储、精准检索和安全应用，内置RAG增强引擎与多模态解析，集成行业级知识图谱能力，支持多源异构数据接入、动态权限配置和智能语义检索，灵活适配不同行业知识管理需求，为用户提供开箱即用的知识工程服务，加速知识资产在企业运营中的价值转化。</a:t>
+              </a:r>
+            </a:p>
+          </p:txBody>
+        </p:sp>
+      `;
+
+      const el = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+      const textContainer = Array.from(el.querySelectorAll('div')).find(
+        (div) =>
+          div.textContent?.includes('提供企业知识资产全生命周期管理能力') &&
+          div.style.flexDirection === 'column',
+      ) as HTMLElement | undefined;
+
+      expect(textContainer).toBeDefined();
+      expect(textContainer!.style.transform).not.toContain('scale(');
+      expect(textContainer!.style.overflowY).toBe('visible');
+    } finally {
+      clientWidthSpy.mockRestore();
+      clientHeightSpy.mockRestore();
+      scrollWidthSpy.mockRestore();
+      scrollHeightSpy.mockRestore();
+    }
+  });
+
   it('does not apply implicit single-line shrink to bullet labels without autofit (xcloud-solution slide 26)', () => {
     const isFitContainer = (el: HTMLElement) =>
       el.style.display === 'flex' && el.style.flexDirection === 'column';
@@ -994,6 +1185,77 @@ describe('ShapeRenderer', () => {
     }
   });
 
+  it('allows long inherited-noAutofit titles to wrap instead of shrinking heavily (xcloud-intro slide 14)', () => {
+    const isFitContainer = (el: HTMLElement) =>
+      el.style.display === 'flex' && el.style.flexDirection === 'column';
+    const clientWidthSpy = vi
+      .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 1120 : 0;
+      });
+    const clientHeightSpy = vi
+      .spyOn(HTMLElement.prototype, 'clientHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 44 : 0;
+      });
+    const scrollWidthSpy = vi
+      .spyOn(HTMLElement.prototype, 'scrollWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) && this.style.whiteSpace === 'nowrap' ? 1366 : 1120;
+      });
+    const scrollHeightSpy = vi
+      .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) && this.style.whiteSpace === 'nowrap' ? 44 : 88;
+      });
+
+    try {
+      const xml = `
+        <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+              xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <p:nvSpPr>
+            <p:cNvPr id="2" name="标题 1"/>
+            <p:cNvSpPr/>
+            <p:nvPr><p:ph type="title"/></p:nvPr>
+          </p:nvSpPr>
+          <p:spPr>
+            <a:xfrm><a:off x="760413" y="414000"/><a:ext cx="10668001" cy="418576"/></a:xfrm>
+          </p:spPr>
+          <p:txBody>
+            <a:bodyPr/>
+            <a:lstStyle/>
+            <a:p>
+              <a:r>
+                <a:rPr lang="en-US" altLang="zh-CN" sz="2400"><a:latin typeface="+mn-lt"/></a:rPr>
+                <a:t>Lenovo Intelligent Cloud Appliance Assists Customer to Build Meteorological Digital Cloud Foundation</a:t>
+              </a:r>
+            </a:p>
+          </p:txBody>
+        </p:sp>
+      `;
+      const shapeNode = parseShapeNode(parseXml(xml));
+      shapeNode.textBody!.layoutBodyProperties = parseXml(
+        '<bodyPr wrap="square" lIns="0" tIns="0" rIns="0" bIns="0" anchor="t"><noAutofit/></bodyPr>',
+      );
+
+      const el = renderShape(shapeNode, createMockRenderContext());
+      const textContainer = Array.from(el.querySelectorAll('div')).find(
+        (div) =>
+          div.textContent?.includes('Meteorological Digital Cloud Foundation') &&
+          div.style.flexDirection === 'column',
+      ) as HTMLElement | undefined;
+
+      expect(textContainer).toBeDefined();
+      expect(textContainer!.style.transform).not.toContain('scale(');
+      expect(textContainer!.style.width).toBe('100%');
+    } finally {
+      clientWidthSpy.mockRestore();
+      clientHeightSpy.mockRestore();
+      scrollWidthSpy.mockRestore();
+      scrollHeightSpy.mockRestore();
+    }
+  });
+
   it('does not shrink horizontal spAutoFit text when wrapped layout already fits (ai-computing slide 23)', () => {
     const isFitContainer = (el: HTMLElement) =>
       el.style.display === 'flex' && el.style.flexDirection === 'column';
@@ -1130,6 +1392,171 @@ describe('ShapeRenderer', () => {
       ) as HTMLElement | undefined;
 
       expect(textContainer).toBeDefined();
+      expect(textContainer!.style.transform).not.toContain('scale(');
+      expect(textContainer!.style.width).toBe('100%');
+      expect(textContainer!.style.height).toBe('100%');
+    } finally {
+      clientWidthSpy.mockRestore();
+      clientHeightSpy.mockRestore();
+      scrollWidthSpy.mockRestore();
+      scrollHeightSpy.mockRestore();
+    }
+  });
+
+  it('does not collapse wrapped spAutoFit body text to nowrap width (xcloud-solution slide 38)', () => {
+    const isFitContainer = (el: HTMLElement) =>
+      el.style.display === 'flex' && el.style.flexDirection === 'column';
+    const clientWidthSpy = vi
+      .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 211 : 0;
+      });
+    const clientHeightSpy = vi
+      .spyOn(HTMLElement.prototype, 'clientHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 97 : 0;
+      });
+    const scrollWidthSpy = vi
+      .spyOn(HTMLElement.prototype, 'scrollWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        if (!isFitContainer(this)) return 0;
+        return this.style.whiteSpace === 'nowrap' ? 1048 : 211;
+      });
+    const scrollHeightSpy = vi
+      .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        if (!isFitContainer(this)) return 0;
+        if (this.style.whiteSpace === 'nowrap') return 97;
+        const paragraph = this.querySelector('div') as HTMLElement | null;
+        return paragraph?.style.lineHeight === '1.1' ? 105 : 132;
+      });
+
+    try {
+      const xml = `
+        <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+              xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <p:nvSpPr>
+            <p:cNvPr id="87" name="文本框 86"/>
+            <p:cNvSpPr txBox="1"/>
+            <p:nvPr/>
+          </p:nvSpPr>
+          <p:spPr>
+            <a:xfrm><a:off x="9123473" y="2463215"/><a:ext cx="2011782" cy="923330"/></a:xfrm>
+            <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+            <a:noFill/>
+          </p:spPr>
+          <p:txBody>
+            <a:bodyPr wrap="square" lIns="0" tIns="0" rIns="0" bIns="0" rtlCol="0" anchor="ctr">
+              <a:spAutoFit/>
+            </a:bodyPr>
+            <a:lstStyle/>
+            <a:p>
+              <a:pPr algn="just"/>
+              <a:r>
+                <a:rPr lang="zh-CN" altLang="en-US" sz="1200">
+                  <a:solidFill><a:schemeClr val="tx1"><a:lumMod val="75000"/><a:lumOff val="25000"/></a:schemeClr></a:solidFill>
+                  <a:latin typeface="微软雅黑"/>
+                  <a:ea typeface="微软雅黑"/>
+                </a:rPr>
+                <a:t>支持策略全生命周期管理（创建、配置、停用）、安全规则可视化编辑与发布、策略模拟测试，以及三方云服务密钥管理。需搭配内容检测服务使用。</a:t>
+              </a:r>
+            </a:p>
+          </p:txBody>
+        </p:sp>
+      `;
+
+      const el = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+      const textContainer = Array.from(el.querySelectorAll('div')).find(
+        (div) =>
+          div.textContent?.includes('支持策略全生命周期管理') &&
+          div.style.flexDirection === 'column',
+      ) as HTMLElement | undefined;
+      const paragraph = textContainer?.querySelector('div') as HTMLElement | null;
+
+      expect(textContainer).toBeDefined();
+      expect(paragraph?.style.lineHeight).toBe('1.1');
+      expect(textContainer!.style.transform).not.toContain('scale(');
+      expect(textContainer!.style.width).toBe('100%');
+      expect(textContainer!.style.height).toBe('100%');
+    } finally {
+      clientWidthSpy.mockRestore();
+      clientHeightSpy.mockRestore();
+      scrollWidthSpy.mockRestore();
+      scrollHeightSpy.mockRestore();
+    }
+  });
+
+  it('keeps bullet spAutoFit text at full size when nowrap fits the original box (xcloud-solution slide 27)', () => {
+    const isFitContainer = (el: HTMLElement) =>
+      el.style.display === 'flex' && el.style.flexDirection === 'column';
+    const clientWidthSpy = vi
+      .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 427 : 0;
+      });
+    const clientHeightSpy = vi
+      .spyOn(HTMLElement.prototype, 'clientHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 58 : 0;
+      });
+    const scrollWidthSpy = vi
+      .spyOn(HTMLElement.prototype, 'scrollWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 427 : 0;
+      });
+    const scrollHeightSpy = vi
+      .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        if (!isFitContainer(this)) return 0;
+        return this.style.whiteSpace === 'nowrap' ? 58 : 73;
+      });
+
+    try {
+      const xml = `
+        <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+              xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <p:nvSpPr>
+            <p:cNvPr id="26" name="文本框 25"/>
+            <p:cNvSpPr txBox="1"/>
+            <p:nvPr/>
+          </p:nvSpPr>
+          <p:spPr>
+            <a:xfrm><a:off x="1479548" y="1648903"/><a:ext cx="4064604" cy="548548"/></a:xfrm>
+            <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+            <a:noFill/>
+          </p:spPr>
+          <p:txBody>
+            <a:bodyPr wrap="square" rtlCol="0"><a:spAutoFit/></a:bodyPr>
+            <a:lstStyle/>
+            <a:p>
+              <a:pPr marL="171399" indent="-171399" algn="just">
+                <a:lnSpc><a:spcPct val="150000"/></a:lnSpc>
+                <a:buFont typeface="Arial"/>
+                <a:buChar char="•"/>
+              </a:pPr>
+              <a:r><a:rPr lang="zh-CN" sz="1050" b="1"/><a:t>全栈兼容： </a:t></a:r>
+              <a:r><a:rPr lang="zh-CN" sz="1050"/><a:t>支持主流品牌服务器/存储，无缝兼容各类国产芯片</a:t></a:r>
+            </a:p>
+            <a:p>
+              <a:pPr marL="171399" indent="-171399" algn="just">
+                <a:lnSpc><a:spcPct val="150000"/></a:lnSpc>
+                <a:buFont typeface="Arial"/>
+                <a:buChar char="•"/>
+              </a:pPr>
+              <a:r><a:rPr lang="zh-CN" sz="1050" b="1"/><a:t>开放生态： </a:t></a:r>
+              <a:r><a:rPr lang="zh-CN" sz="1050"/><a:t>构建开放云市场，汇聚丰富应用生态伙伴</a:t></a:r>
+            </a:p>
+          </p:txBody>
+        </p:sp>
+      `;
+
+      const el = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+      const textContainer = Array.from(el.querySelectorAll('div')).find(
+        (div) => div.textContent?.includes('全栈兼容') && div.style.flexDirection === 'column',
+      ) as HTMLElement | undefined;
+
+      expect(textContainer).toBeDefined();
+      expect(textContainer!.style.whiteSpace).toBe('nowrap');
       expect(textContainer!.style.transform).not.toContain('scale(');
       expect(textContainer!.style.width).toBe('100%');
       expect(textContainer!.style.height).toBe('100%');
@@ -1375,6 +1802,146 @@ describe('ShapeRenderer', () => {
       expect(bullet?.style.position).toBe('absolute');
       expect(bullet?.style.left).toBe('0px');
       expect(bullet?.style.width).toBe('30px');
+    } finally {
+      clientWidthSpy.mockRestore();
+      clientHeightSpy.mockRestore();
+      scrollWidthSpy.mockRestore();
+      scrollHeightSpy.mockRestore();
+    }
+  });
+
+  it('keeps dense multi-paragraph spAutoFit text at Office line height (xcloud-solution slide 30 left box)', () => {
+    const isFitContainer = (el: HTMLElement) =>
+      el.style.display === 'flex' && el.style.flexDirection === 'column';
+    const clientWidthSpy = vi
+      .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 295 : 0;
+      });
+    const clientHeightSpy = vi
+      .spyOn(HTMLElement.prototype, 'clientHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 417 : 0;
+      });
+    const scrollWidthSpy = vi
+      .spyOn(HTMLElement.prototype, 'scrollWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 295 : 0;
+      });
+    const scrollHeightSpy = vi
+      .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        if (!isFitContainer(this)) return 0;
+        const firstParagraph = this.querySelector('div') as HTMLElement | null;
+        return firstParagraph?.style.lineHeight === '1.1' ? 410 : 504;
+      });
+
+    try {
+      const xml = `
+        <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+              xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <p:nvSpPr>
+            <p:cNvPr id="34" name="文本框 33"/>
+            <p:cNvSpPr txBox="1"/>
+            <p:nvPr/>
+          </p:nvSpPr>
+          <p:spPr>
+            <a:xfrm><a:off x="963260" y="2043286"/><a:ext cx="2812666" cy="3970318"/></a:xfrm>
+            <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          </p:spPr>
+          <p:txBody>
+            <a:bodyPr wrap="square" rtlCol="0"><a:spAutoFit/></a:bodyPr>
+            <a:lstStyle/>
+            <a:p><a:r><a:rPr sz="1050" b="1"/><a:t>1. 丰富的SAP客户经验</a:t></a:r></a:p>
+            <a:p><a:pPr marL="171450" indent="-171450"><a:buFont typeface="Arial"/><a:buChar char="•"/></a:pPr><a:r><a:rPr sz="1050"/><a:t>全球交付超过50000套SAP HANA系统</a:t></a:r></a:p>
+            <a:p><a:pPr marL="171450" indent="-171450"><a:buFont typeface="Arial"/><a:buChar char="•"/></a:pPr><a:r><a:rPr sz="1050"/><a:t>超多行业头部客户认可，SAP自身S/4平台运行在联想SAP HANA平台上</a:t></a:r></a:p>
+            <a:p><a:pPr marL="171450" indent="-171450"><a:buFont typeface="Arial"/><a:buChar char="•"/></a:pPr><a:endParaRPr lang="zh-CN" sz="1050"/></a:p>
+            <a:p><a:r><a:rPr sz="1050" b="1"/><a:t>2. 出色的性能表现</a:t></a:r></a:p>
+            <a:p><a:pPr marL="171450" indent="-171450"><a:buFont typeface="Arial"/><a:buChar char="•"/></a:pPr><a:r><a:rPr sz="1050"/><a:t>超过13项 SAP相关性能测试世界纪录保持</a:t></a:r></a:p>
+          </p:txBody>
+        </p:sp>
+      `;
+
+      const el = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+      const textContainer = Array.from(el.querySelectorAll('div')).find(
+        (div) =>
+          div.textContent?.includes('丰富的SAP客户经验') && div.style.flexDirection === 'column',
+      ) as HTMLElement | undefined;
+      const firstParagraph = textContainer?.querySelector('div') as HTMLElement | null;
+      const emptyParagraph = Array.from(textContainer?.querySelectorAll('div') ?? []).find(
+        (div) => !div.textContent,
+      ) as HTMLElement | undefined;
+
+      expect(textContainer).toBeDefined();
+      expect(textContainer!.style.transform).not.toContain('scale(');
+      expect(firstParagraph?.style.lineHeight).toBe('1.1');
+      expect(emptyParagraph?.style.fontSize).toBe('10.5pt');
+    } finally {
+      clientWidthSpy.mockRestore();
+      clientHeightSpy.mockRestore();
+      scrollWidthSpy.mockRestore();
+      scrollHeightSpy.mockRestore();
+    }
+  });
+
+  it('uses near-width fit instead of heavy height shrink for short wrapped bullet spAutoFit text (xcloud-solution slide 30 right box)', () => {
+    const isFitContainer = (el: HTMLElement) =>
+      el.style.display === 'flex' && el.style.flexDirection === 'column';
+    const clientWidthSpy = vi
+      .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 295 : 0;
+      });
+    const clientHeightSpy = vi
+      .spyOn(HTMLElement.prototype, 'clientHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 83 : 0;
+      });
+    const scrollWidthSpy = vi
+      .spyOn(HTMLElement.prototype, 'scrollWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        if (!isFitContainer(this)) return 0;
+        return this.style.whiteSpace === 'nowrap' ? 301 : 295;
+      });
+    const scrollHeightSpy = vi
+      .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        if (!isFitContainer(this)) return 0;
+        return this.style.whiteSpace === 'nowrap' ? 83 : 142;
+      });
+
+    try {
+      const xml = `
+        <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+              xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <p:nvSpPr>
+            <p:cNvPr id="8" name="文本框 7"/>
+            <p:cNvSpPr txBox="1"/>
+            <p:nvPr/>
+          </p:nvSpPr>
+          <p:spPr>
+            <a:xfrm><a:off x="8412900" y="2043286"/><a:ext cx="2812666" cy="790922"/></a:xfrm>
+            <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          </p:spPr>
+          <p:txBody>
+            <a:bodyPr wrap="square" rtlCol="0"><a:spAutoFit/></a:bodyPr>
+            <a:lstStyle/>
+            <a:p><a:pPr marL="171450" indent="-171450"><a:lnSpc><a:spcPct val="150000"/></a:lnSpc><a:buFont typeface="Arial"/><a:buChar char="•"/></a:pPr><a:r><a:rPr sz="1050"/><a:t>SAP的全球技术合作伙伴Global Partner</a:t></a:r></a:p>
+            <a:p><a:pPr marL="171450" indent="-171450"><a:lnSpc><a:spcPct val="150000"/></a:lnSpc><a:buFont typeface="Arial"/><a:buChar char="•"/></a:pPr><a:r><a:rPr sz="1050"/><a:t>SAP软件方案合作伙伴 PE Build Partner</a:t></a:r></a:p>
+            <a:p><a:pPr marL="171450" indent="-171450"><a:lnSpc><a:spcPct val="150000"/></a:lnSpc><a:buFont typeface="Arial"/><a:buChar char="•"/></a:pPr><a:r><a:rPr sz="1050"/><a:t>SAP服务合作伙伴 PE Service Partner</a:t></a:r></a:p>
+          </p:txBody>
+        </p:sp>
+      `;
+
+      const el = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+      const textContainer = Array.from(el.querySelectorAll('div')).find(
+        (div) =>
+          div.textContent?.includes('Global Partner') && div.style.flexDirection === 'column',
+      ) as HTMLElement | undefined;
+      const scale = Number(textContainer?.style.transform.match(/scale\(([^)]+)\)/)?.[1] ?? '1');
+
+      expect(textContainer).toBeDefined();
+      expect(scale).toBeGreaterThan(0.95);
     } finally {
       clientWidthSpy.mockRestore();
       clientHeightSpy.mockRestore();
@@ -2516,6 +3083,36 @@ describe('ShapeRenderer', () => {
     const markerPath = el.querySelector('defs marker path');
     expect(markerPath).toBeTruthy();
     expect(markerPath?.getAttribute('d')).toContain('M10,5');
+  });
+
+  it('keeps headEnd stealth arrow shape while insetting the connector start', () => {
+    const xml = `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="581" name="Head Stealth"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="2000000" cy="0"/></a:xfrm>
+          <a:prstGeom prst="line"><a:avLst/></a:prstGeom>
+          <a:ln w="12700">
+            <a:solidFill><a:srgbClr val="000000"/></a:solidFill>
+            <a:headEnd type="stealth" w="med" len="med"/>
+          </a:ln>
+        </p:spPr>
+      </p:sp>
+    `;
+    const shapeNode = parseShapeNode(parseXml(xml));
+    const el = renderShape(shapeNode, createMockRenderContext());
+    const paths = el.querySelectorAll('svg > path');
+    const path = paths[paths.length - 1];
+    const marker = el.querySelector('defs marker');
+    const markerPath = marker?.querySelector('path');
+    const pathNumbers = extractPathNumbers(path?.getAttribute('d') ?? '');
+
+    expect(path).toBeTruthy();
+    expect(markerPath).toBeTruthy();
+    expect(markerPath?.getAttribute('d')).toContain('M0,5');
+    expect(marker?.getAttribute('refX')).toBe('10');
+    expect(pathNumbers[0]).toBeGreaterThan(6);
   });
 
   it('renders diamond arrowhead marker', () => {

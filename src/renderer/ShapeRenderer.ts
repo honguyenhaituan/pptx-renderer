@@ -36,6 +36,36 @@ function hasExplicitCenteredParagraph(textBody: TextBody): boolean {
   return visibleParagraphs.every((p) => p.properties?.attr('algn') === 'ctr');
 }
 
+const IMPLICIT_SINGLE_LINE_LABEL_MAX_CHARS = 36;
+
+function visibleTextLength(textBody: TextBody): number {
+  const text = textBody.paragraphs
+    .flatMap((p) => p.runs.map((r) => r.text ?? ''))
+    .join('')
+    .replace(/\s+/g, '');
+  return Array.from(text).length;
+}
+
+function isShortImplicitSingleLineLabel(textBody: TextBody): boolean {
+  const length = visibleTextLength(textBody);
+  return length > 0 && length <= IMPLICIT_SINGLE_LINE_LABEL_MAX_CHARS;
+}
+
+function visibleParagraphCount(textBody: TextBody): number {
+  return textBody.paragraphs.filter((paragraph) =>
+    paragraph.runs.some((run) => run.text != null && run.text.length > 0),
+  ).length;
+}
+
+function hasExplicitParagraphSpacing(textBody: TextBody): boolean {
+  return textBody.paragraphs.some((paragraph) => {
+    const pPr = paragraph.properties;
+    return (
+      pPr?.child('lnSpc').exists() || pPr?.child('spcBef').exists() || pPr?.child('spcAft').exists()
+    );
+  });
+}
+
 function paragraphHasBullet(
   textBody: TextBody,
   paragraph: TextBody['paragraphs'][number],
@@ -127,6 +157,8 @@ const WRAPPED_AUTOFIT_HEIGHT_TOLERANCE = 1.1;
 // metric overhang; allow a larger margin without applying one-line shrink.
 const SINGLE_PARAGRAPH_WRAPPED_AUTOFIT_HEIGHT_TOLERANCE = 1.25;
 const WRAPPED_AUTOFIT_WIDTH_TOLERANCE_PX = 1;
+const NO_AUTOFIT_TITLE_METRIC_SCALE_FLOOR = 0.9;
+const SP_AUTOFIT_UNWRAPPED_WIDTH_SCALE_FLOOR = 0.9;
 
 function getSupportedTextWarpPreset(textBody: TextBody): 'textArchDown' | 'textArchUp' | null {
   const prstTxWarp = textBody.bodyProperties?.child('prstTxWarp');
@@ -567,6 +599,143 @@ function getMarkerSize(size: string | undefined): number {
   }
 }
 
+function getMarkerDimensions(
+  info: LineEndInfo,
+  strokeWidth: number,
+): { markerW: number; markerH: number } {
+  const wMul = getMarkerSize(info.w);
+  const lenMul = getMarkerSize(info.len);
+  // Arrow size proportional to stroke width with balanced floor:
+  // avoid tiny markers, but do not overgrow relative to line length.
+  const baseLen = Math.max(strokeWidth * 3, 6.5);
+  const baseW = Math.max(strokeWidth * 2.5, 5);
+  return {
+    markerW: baseLen * lenMul,
+    markerH: baseW * wMul,
+  };
+}
+
+function getHeadEndStartInset(info: LineEndInfo, strokeWidth: number): number {
+  if (info.type !== 'triangle' && info.type !== 'arrow' && info.type !== 'stealth') return 0;
+  return getMarkerDimensions(info, strokeWidth).markerW;
+}
+
+function isFullyTransparentCssColor(color: string | undefined): boolean {
+  if (!color) return true;
+  const normalized = color.trim().toLowerCase();
+  if (normalized === 'transparent') return true;
+  const rgbaMatch = normalized.match(/^rgba\([^,]+,[^,]+,[^,]+,\s*([0-9.]+)\)$/);
+  return rgbaMatch ? Number(rgbaMatch[1]) <= 0.001 : false;
+}
+
+function getGradientMarkerColor(
+  stops: Array<{ color: string }>,
+  end: 'start' | 'end',
+  fallback: string,
+): string {
+  if (stops.length === 0) return fallback;
+
+  const firstIndex = end === 'start' ? 0 : stops.length - 1;
+  const step = end === 'start' ? 1 : -1;
+  const preferred = stops[firstIndex]?.color;
+  if (preferred && !isFullyTransparentCssColor(preferred)) return preferred;
+
+  for (let i = firstIndex; i >= 0 && i < stops.length; i += step) {
+    const color = stops[i]?.color;
+    if (color && !isFullyTransparentCssColor(color)) return color;
+  }
+
+  return preferred || fallback;
+}
+
+type Point = { x: number; y: number };
+
+function lerpPoint(a: Point, b: Point, t: number): Point {
+  return {
+    x: a.x + (b.x - a.x) * t,
+    y: a.y + (b.y - a.y) * t,
+  };
+}
+
+function cubicPoint(p0: Point, p1: Point, p2: Point, p3: Point, t: number): Point {
+  const a = lerpPoint(p0, p1, t);
+  const b = lerpPoint(p1, p2, t);
+  const c = lerpPoint(p2, p3, t);
+  const d = lerpPoint(a, b, t);
+  const e = lerpPoint(b, c, t);
+  return lerpPoint(d, e, t);
+}
+
+function approximateCubicLength(p0: Point, p1: Point, p2: Point, p3: Point, tEnd: number): number {
+  const steps = 24;
+  let length = 0;
+  let prev = p0;
+  for (let i = 1; i <= steps; i++) {
+    const point = cubicPoint(p0, p1, p2, p3, (tEnd * i) / steps);
+    length += Math.hypot(point.x - prev.x, point.y - prev.y);
+    prev = point;
+  }
+  return length;
+}
+
+function insetCubicPathStart(pathD: string, inset: number): string {
+  const n = '-?\\d*\\.?\\d+(?:e[-+]?\\d+)?';
+  const match = pathD.match(
+    new RegExp(`^M(${n}),(${n}) C(${n}),(${n}) (${n}),(${n}) (${n}),(${n})(?: (.*))?$`, 'i'),
+  );
+  if (!match) return pathD;
+
+  const p0 = { x: Number(match[1]), y: Number(match[2]) };
+  const p1 = { x: Number(match[3]), y: Number(match[4]) };
+  const p2 = { x: Number(match[5]), y: Number(match[6]) };
+  const p3 = { x: Number(match[7]), y: Number(match[8]) };
+  const rest = match[9];
+  const totalLength = approximateCubicLength(p0, p1, p2, p3, 1);
+  if (!(totalLength > 0)) return pathD;
+
+  const target = Math.min(inset, totalLength * 0.95);
+  let lo = 0;
+  let hi = 1;
+  for (let i = 0; i < 24; i++) {
+    const mid = (lo + hi) / 2;
+    if (approximateCubicLength(p0, p1, p2, p3, mid) < target) lo = mid;
+    else hi = mid;
+  }
+
+  const t = hi;
+  const a = lerpPoint(p0, p1, t);
+  const b = lerpPoint(p1, p2, t);
+  const c = lerpPoint(p2, p3, t);
+  const d = lerpPoint(a, b, t);
+  const e = lerpPoint(b, c, t);
+  const start = lerpPoint(d, e, t);
+  const trimmed = `M${start.x},${start.y} C${e.x},${e.y} ${c.x},${c.y} ${p3.x},${p3.y}`;
+  return rest ? `${trimmed} ${rest}` : trimmed;
+}
+
+function insetPathStart(pathD: string, inset: number): string {
+  if (!(inset > 0)) return pathD;
+
+  const match = pathD.match(
+    /^M(-?\d*\.?\d+(?:e[-+]?\d+)?),(-?\d*\.?\d+(?:e[-+]?\d+)?) L(-?\d*\.?\d+(?:e[-+]?\d+)?),(-?\d*\.?\d+(?:e[-+]?\d+)?)$/i,
+  );
+  if (!match) return insetCubicPathStart(pathD, inset);
+
+  const x1 = Number(match[1]);
+  const y1 = Number(match[2]);
+  const x2 = Number(match[3]);
+  const y2 = Number(match[4]);
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const length = Math.hypot(dx, dy);
+  if (!(length > 0)) return pathD;
+
+  const clampedInset = Math.min(inset, length * 0.95);
+  const nextX = x1 + (dx / length) * clampedInset;
+  const nextY = y1 + (dy / length) * clampedInset;
+  return `M${nextX},${nextY} L${x2},${y2}`;
+}
+
 /**
  * Create an SVG marker element for a line end (arrowhead).
  */
@@ -586,20 +755,12 @@ function createArrowMarker(
   marker.setAttribute('markerUnits', 'userSpaceOnUse');
   marker.setAttribute('orient', 'auto');
 
-  const wMul = getMarkerSize(info.w);
-  const lenMul = getMarkerSize(info.len);
-  // Arrow size proportional to stroke width with balanced floor:
-  // avoid tiny markers, but do not overgrow relative to line length.
-  const baseLen = Math.max(strokeWidth * 4, 6.5);
-  const baseW = Math.max(strokeWidth * 3.2, 5);
-  const markerW = baseLen * lenMul;
-  const markerH = baseW * wMul;
+  const { markerW, markerH } = getMarkerDimensions(info, strokeWidth);
 
   switch (info.type) {
     case 'triangle':
     case 'arrow': {
       marker.setAttribute('viewBox', '0 0 10 10');
-      // Anchor the arrow tip on the path endpoint so it does not intrude into target shapes.
       marker.setAttribute('refX', '10');
       marker.setAttribute('refY', '5');
       marker.setAttribute('markerWidth', String(markerW));
@@ -1235,14 +1396,23 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
       // For gradient strokes, use first stop for marker-start and last stop for marker-end
       // so arrowhead colours match the visible gradient end rather than always using the lightest stop.
       const gradStartColor = gradientStroke
-        ? gradientStroke.stops[0]?.color || 'black'
+        ? getGradientMarkerColor(gradientStroke.stops, 'start', 'black')
         : strokeColor;
       const gradEndColor = gradientStroke
-        ? gradientStroke.stops[gradientStroke.stops.length - 1]?.color || gradStartColor
+        ? getGradientMarkerColor(gradientStroke.stops, 'end', gradStartColor)
         : strokeColor;
       let effectiveStrokeWidth = gradientStroke ? gradientStroke.width : strokeWidth;
       if (isLineLike && (effectiveHeadEnd || effectiveTailEnd) && effectiveStrokeWidth <= 0) {
         effectiveStrokeWidth = 1; // so connector line and arrows both show (e.g. slide 24)
+      }
+      const effectiveStrokeLinecap =
+        isLineLike && (effectiveHeadEnd || effectiveTailEnd) ? 'butt' : strokeLinecap;
+      if (isLineLike && effectiveHeadEnd && effectiveStrokeWidth > 0) {
+        const headInset = getHeadEndStartInset(effectiveHeadEnd, effectiveStrokeWidth);
+        if (headInset > 0) {
+          pathD = insetPathStart(pathD, headInset);
+          path.setAttribute('d', pathD);
+        }
       }
 
       // Stroke — gradient stroke or solid stroke (skip for circularArrow; already set stroke=none above)
@@ -1304,7 +1474,7 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
         const strokeW = Math.max(gradientStroke.width, 1);
         path.setAttribute('stroke', `url(#${gradId})`);
         path.setAttribute('stroke-width', String(strokeW));
-        if (strokeLinecap) path.setAttribute('stroke-linecap', strokeLinecap);
+        if (effectiveStrokeLinecap) path.setAttribute('stroke-linecap', effectiveStrokeLinecap);
         if (strokeLinejoin) path.setAttribute('stroke-linejoin', strokeLinejoin);
       } else if (
         !isCircularArrow &&
@@ -1314,7 +1484,7 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
       ) {
         path.setAttribute('stroke', strokeColor);
         path.setAttribute('stroke-width', String(effectiveStrokeWidth));
-        if (strokeLinecap) path.setAttribute('stroke-linecap', strokeLinecap);
+        if (effectiveStrokeLinecap) path.setAttribute('stroke-linecap', effectiveStrokeLinecap);
         if (strokeLinejoin) path.setAttribute('stroke-linejoin', strokeLinejoin);
         const svgDashArray = svgDashArrayForKind(strokeDashKind, effectiveStrokeWidth);
         if (svgDashArray) {
@@ -1692,7 +1862,9 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
         !hasNormAutofit &&
         !hasNoAutofit &&
         isSingleLineTextBody(node.textBody) &&
-        !hasBulletParagraph(node.textBody);
+        !hasBulletParagraph(node.textBody) &&
+        (textWrap === 'none' ||
+          (textWrap === undefined && isShortImplicitSingleLineLabel(node.textBody)));
       const usesNoAutofitSingleLineTitleFit =
         hasNoAutofit && isTitlePlaceholder(node.placeholder) && isSingleLineTextBody(node.textBody);
       textContainer.style.overflowX = 'visible';
@@ -1855,17 +2027,31 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
               ...(fontRefColor ? { fontRefColor } : {}),
               ...(isVerticalText ? { isVerticalText } : {}),
               ...(hasSpAutoFit && !hasNormAutofit
-                ? {
-                    trimOuterParagraphSpacing: true,
-                    ...(isSingleLineSpAutoFit &&
-                    !isVerticalText &&
-                    (textWrap === 'none' || hasCenteredParagraphs)
-                      ? {
-                          compactSingleLineSpacing: true,
-                          defaultLineHeight: '1',
-                        }
-                      : {}),
-                  }
+                ? (() => {
+                    const paragraphCount = visibleParagraphCount(node.textBody);
+                    const hasExplicitSpacing = hasExplicitParagraphSpacing(node.textBody);
+                    const shouldUseOfficeWrappedLineHeight =
+                      !hasExplicitSpacing &&
+                      textWrap !== 'none' &&
+                      (paragraphCount > 1 ||
+                        visibleTextLength(node.textBody) > IMPLICIT_SINGLE_LINE_LABEL_MAX_CHARS);
+
+                    return {
+                      trimOuterParagraphSpacing: true,
+                      ...(isSingleLineSpAutoFit &&
+                      !isVerticalText &&
+                      (textWrap === 'none' || hasCenteredParagraphs)
+                        ? {
+                            compactSingleLineSpacing: true,
+                            defaultLineHeight: '1',
+                          }
+                        : shouldUseOfficeWrappedLineHeight
+                          ? {
+                              defaultLineHeight: '1.1',
+                            }
+                          : {}),
+                    };
+                  })()
                 : {}),
             }
           : undefined;
@@ -1880,11 +2066,13 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
         const baseTransformOrigin = textContainer.style.transformOrigin;
         const baseWidth = textContainer.style.width;
         const baseHeight = textContainer.style.height;
+        const baseWhiteSpace = textContainer.style.whiteSpace;
         const applyDynamicAutofit = () => {
           textContainer.style.transform = baseTransform;
           textContainer.style.transformOrigin = baseTransformOrigin;
           textContainer.style.width = baseWidth;
           textContainer.style.height = baseHeight;
+          textContainer.style.whiteSpace = baseWhiteSpace;
 
           // The wrapper is not always in the DOM yet, so temporarily attach it offscreen to measure.
           const wasConnected = wrapper.isConnected;
@@ -1923,13 +2111,16 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
             !spAutoFitAllowsHorizontalOverflow &&
             !wrappedFits &&
             (!wrappedWidthFits ||
+              !wrappedHeightFits ||
               isSingleLineSpAutoFit ||
               usesImplicitSingleLineFit ||
               usesNoAutofitSingleLineTitleFit);
+          let measuredUnwrappedWidth = false;
           if (shouldMeasureUnwrappedWidth) {
             textContainer.style.whiteSpace = 'nowrap';
             contentW = textContainer.scrollWidth;
             contentH = textContainer.scrollHeight;
+            measuredUnwrappedWidth = true;
             textContainer.style.whiteSpace = savedWhiteSpace;
           }
           textContainer.style.justifyContent = savedJC;
@@ -1939,15 +2130,58 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
           }
           let scale = 1;
           const fitWidthOnly = usesNoAutofitSingleLineTitleFit;
+          const usesUnwrappedNoScaleFit =
+            hasSpAutoFit &&
+            !hasNormAutofit &&
+            textWrap !== 'none' &&
+            measuredUnwrappedWidth &&
+            !wrappedHeightFits &&
+            contentW <= containerW + WRAPPED_AUTOFIT_WIDTH_TOLERANCE_PX &&
+            contentH <= containerH;
+          if (usesUnwrappedNoScaleFit) {
+            textContainer.style.whiteSpace = 'nowrap';
+          }
           if (
             !spAutoFitAllowsHorizontalOverflow &&
             contentW > containerW + WRAPPED_AUTOFIT_WIDTH_TOLERANCE_PX &&
             containerW > 0
           ) {
-            scale = Math.min(scale, containerW / contentW);
+            const widthScale = containerW / contentW;
+            const canFitWrappedLinesByWidth =
+              hasSpAutoFit &&
+              !hasNormAutofit &&
+              !wrappedHeightFits &&
+              contentH <= containerH &&
+              widthScale >= SP_AUTOFIT_UNWRAPPED_WIDTH_SCALE_FLOOR;
+            const usesSingleLineSpAutoFitWidthFit =
+              hasSpAutoFit &&
+              !hasNormAutofit &&
+              isSingleLineSpAutoFit &&
+              (textWrap === undefined || textWrap === 'none' || hasCenteredParagraphs);
+            const canUseUnwrappedWidthScale =
+              !hasSpAutoFit ||
+              hasNormAutofit ||
+              canFitWrappedLinesByWidth ||
+              usesSingleLineSpAutoFitWidthFit ||
+              usesImplicitSingleLineFit ||
+              usesNoAutofitSingleLineTitleFit;
+            if (
+              canUseUnwrappedWidthScale &&
+              (!fitWidthOnly || widthScale >= NO_AUTOFIT_TITLE_METRIC_SCALE_FLOOR)
+            ) {
+              scale = Math.min(scale, widthScale);
+            }
           }
+          const usesUnwrappedWidthFit =
+            hasSpAutoFit &&
+            !hasNormAutofit &&
+            scale < 1 &&
+            contentH <= containerH &&
+            !wrappedHeightFits;
           if (
             !fitWidthOnly &&
+            !usesUnwrappedNoScaleFit &&
+            !usesUnwrappedWidthFit &&
             !spAutoFitAllowsVerticalOverflow &&
             !wrappedHeightFits &&
             contentH > containerH &&
@@ -1957,6 +2191,8 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
           }
           if (
             !fitWidthOnly &&
+            !usesUnwrappedNoScaleFit &&
+            !usesUnwrappedWidthFit &&
             !spAutoFitAllowsVerticalOverflow &&
             scale === 1 &&
             !wrappedHeightFits &&
