@@ -6,6 +6,7 @@ import {
   resolveLineStyle,
   resolveGradientFill,
   resolveGradientStroke,
+  resolveThemeFillReference,
 } from '../../../src/renderer/StyleResolver';
 import { createMockRenderContext } from '../helpers/mockContext';
 import { xmlNode } from '../helpers/xmlNode';
@@ -139,6 +140,59 @@ describe('resolveColor', () => {
       const result = resolveColor(node, ctx);
 
       expect(result.color).toBe('#363636');
+    });
+
+    it('collects alphaModFix amt from color XML', () => {
+      const ctx = createMockRenderContext();
+      const node = xmlNode(`<solidFill>
+        <srgbClr val="FF0000">
+          <alpha val="80000"/>
+          <alphaModFix amt="50000"/>
+        </srgbClr>
+      </solidFill>`);
+
+      const result = resolveColor(node, ctx);
+
+      expect(result.alpha).toBeCloseTo(0.4, 5);
+    });
+
+    it('collects val-less comp modifier from color XML', () => {
+      const ctx = createMockRenderContext();
+      const node = xmlNode(`<solidFill>
+        <srgbClr val="FF0000">
+          <comp/>
+        </srgbClr>
+      </solidFill>`);
+
+      const result = resolveColor(node, ctx);
+
+      expect(result.color).toBe('#00ffff');
+    });
+
+    it('collects val-less gamma modifier from color XML', () => {
+      const ctx = createMockRenderContext();
+      const node = xmlNode(`<solidFill>
+        <srgbClr val="808080">
+          <gamma/>
+        </srgbClr>
+      </solidFill>`);
+
+      const result = resolveColor(node, ctx);
+
+      expect(result.color).toBe('#373737');
+    });
+
+    it('collects val-less invGamma modifier from color XML', () => {
+      const ctx = createMockRenderContext();
+      const node = xmlNode(`<solidFill>
+        <srgbClr val="808080">
+          <invGamma/>
+        </srgbClr>
+      </solidFill>`);
+
+      const result = resolveColor(node, ctx);
+
+      expect(result.color).toBe('#bcbcbc');
     });
   });
 
@@ -576,6 +630,24 @@ describe('resolveColor — direct color node (selfTag branch)', () => {
     expect(result.color).toMatch(/0000[Ff][Ff]/i);
   });
 
+  it('resolves hslClr node passed directly without wrapper', () => {
+    const ctx = createMockRenderContext();
+    const node = parseXml(
+      `<hslClr xmlns="http://schemas.openxmlformats.org/drawingml/2006/main" hue="0" sat="100000" lum="50000"/>`,
+    );
+    const result = resolveColor(node, ctx);
+    expect(result.color.toLowerCase().replace(/^#?/, '#')).toBe('#ff0000');
+  });
+
+  it('resolves scrgbClr node passed directly without wrapper', () => {
+    const ctx = createMockRenderContext();
+    const node = parseXml(
+      `<scrgbClr xmlns="http://schemas.openxmlformats.org/drawingml/2006/main" r="0" g="100000" b="0"/>`,
+    );
+    const result = resolveColor(node, ctx);
+    expect(result.color.toLowerCase().replace(/^#?/, '#')).toBe('#00ff00');
+  });
+
   it('returns black fallback for unrecognized node type', () => {
     const ctx = createMockRenderContext();
     // Node that is neither a color type nor contains color children
@@ -973,6 +1045,38 @@ describe('resolvePatternFill — additional pattern presets', () => {
     expect(result).toContain('repeating-linear-gradient');
     expect(result).toContain('#000000');
     expect(result).toContain('#ffffff');
+  });
+});
+
+describe('resolveThemeFillReference — pattern phClr placeholder colors', () => {
+  it('uses fillRef color for pattFill foreground phClr', () => {
+    const ctx = createMockRenderContext();
+    ctx.theme.fillStyles = [
+      xmlNode(`<pattFill prst="pct20">
+        <fgClr><schemeClr val="phClr"/></fgClr>
+        <bgClr><srgbClr val="FFFFFF"/></bgClr>
+      </pattFill>`),
+    ];
+    const fillRef = xmlNode('<fillRef idx="1"><srgbClr val="FF0000"/></fillRef>');
+
+    const result = resolveThemeFillReference(fillRef, ctx);
+
+    expect(result.fillCss.toLowerCase()).toContain('#ff0000');
+  });
+
+  it('uses fillRef color for pattFill background phClr', () => {
+    const ctx = createMockRenderContext();
+    ctx.theme.fillStyles = [
+      xmlNode(`<pattFill prst="pct20">
+        <fgClr><srgbClr val="000000"/></fgClr>
+        <bgClr><schemeClr val="phClr"/></bgClr>
+      </pattFill>`),
+    ];
+    const fillRef = xmlNode('<fillRef idx="1"><srgbClr val="00FF00"/></fillRef>');
+
+    const result = resolveThemeFillReference(fillRef, ctx);
+
+    expect(result.fillCss.toLowerCase()).toContain('#00ff00');
   });
 });
 

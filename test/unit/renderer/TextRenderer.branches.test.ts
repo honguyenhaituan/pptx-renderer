@@ -495,6 +495,175 @@ describe('TextRenderer — branch coverage (uncovered paths)', () => {
   });
 
   // ============================================================================
+  // Run-level highlight, underline fill, and pattern text fill
+  // ============================================================================
+  describe('run highlight and underline fills', () => {
+    it('applies run highlight from srgbClr', () => {
+      const body = makeTextBody({
+        paragraphs: [
+          {
+            runs: [
+              {
+                text: 'Highlighted',
+                properties: xmlNode(`<rPr><highlight><srgbClr val="FFFF00"/></highlight></rPr>`),
+              },
+            ],
+            level: 0,
+          },
+        ],
+      });
+
+      const span = renderToContainer(body).querySelector('span')!;
+
+      expect(span.style.backgroundColor).toBe('rgb(255, 255, 0)');
+    });
+
+    it('applies run highlight from schemeClr', () => {
+      const body = makeTextBody({
+        paragraphs: [
+          {
+            runs: [
+              {
+                text: 'Scheme highlight',
+                properties: xmlNode(`<rPr><highlight><schemeClr val="accent1"/></highlight></rPr>`),
+              },
+            ],
+            level: 0,
+          },
+        ],
+      });
+
+      const span = renderToContainer(body).querySelector('span')!;
+
+      expect(span.style.backgroundColor).toBe('rgb(68, 114, 196)');
+    });
+
+    it('applies underline color from uFill solidFill', () => {
+      const body = makeTextBody({
+        paragraphs: [
+          {
+            runs: [
+              {
+                text: 'Underlined',
+                properties: xmlNode(
+                  `<rPr u="sng"><uFill><solidFill><srgbClr val="FF0000"/></solidFill></uFill></rPr>`,
+                ),
+              },
+            ],
+            level: 0,
+          },
+        ],
+      });
+
+      const span = renderToContainer(body).querySelector('span')!;
+
+      expect(span.style.textDecoration).toContain('underline');
+      expect(span.style.textDecorationColor.toLowerCase()).toBe('#ff0000');
+    });
+
+    it('uses text color for underline when uFillTx is present', () => {
+      const body = makeTextBody({
+        paragraphs: [
+          {
+            runs: [
+              {
+                text: 'Follow text underline',
+                properties: xmlNode(
+                  `<rPr u="sng"><solidFill><srgbClr val="00FF00"/></solidFill><uFillTx/></rPr>`,
+                ),
+              },
+            ],
+            level: 0,
+          },
+        ],
+      });
+
+      const span = renderToContainer(body).querySelector('span')!;
+
+      expect(span.style.textDecorationColor.toLowerCase()).toBe('#00ff00');
+    });
+
+    it('renders text pattFill via clipped background', () => {
+      const body = makeTextBody({
+        paragraphs: [
+          {
+            runs: [
+              {
+                text: 'Pattern text',
+                properties: xmlNode(
+                  `<rPr><pattFill prst="pct20"><fgClr><srgbClr val="000000"/></fgClr><bgClr><srgbClr val="FFFFFF"/></bgClr></pattFill></rPr>`,
+                ),
+              },
+            ],
+            level: 0,
+          },
+        ],
+      });
+
+      const span = renderToContainer(body).querySelector('span') as HTMLElement & {
+        style: CSSStyleDeclaration & { webkitBackgroundClip?: string };
+      };
+
+      expect(span.style.background || span.style.backgroundImage).toContain('radial-gradient');
+      expect(span.style.webkitBackgroundClip).toBe('text');
+      expect(span.style.color).toBe('transparent');
+    });
+  });
+
+  // ============================================================================
+  // OOXML paragraph alignment aliases and direction
+  // ============================================================================
+  describe('paragraph alignment and direction OOXML values', () => {
+    it('maps algn="justLow" to justify', () => {
+      const body = makeTextBody({
+        paragraphs: [
+          {
+            properties: xmlNode(`<pPr algn="justLow"/>`),
+            runs: [{ text: 'Just low' }],
+            level: 0,
+          },
+        ],
+      });
+
+      const para = renderToContainer(body).children[0] as HTMLElement;
+
+      expect(para.style.textAlign).toBe('justify');
+    });
+
+    it('maps algn="thaiDist" to justify', () => {
+      const body = makeTextBody({
+        paragraphs: [
+          {
+            properties: xmlNode(`<pPr algn="thaiDist"/>`),
+            runs: [{ text: 'Thai distributed' }],
+            level: 0,
+          },
+        ],
+      });
+
+      const para = renderToContainer(body).children[0] as HTMLElement;
+
+      expect(para.style.textAlign).toBe('justify');
+    });
+
+    it('applies rtl paragraph direction', () => {
+      const body = makeTextBody({
+        paragraphs: [
+          {
+            properties: xmlNode(`<pPr rtl="1"/>`),
+            runs: [{ text: 'RTL' }],
+            level: 0,
+          },
+        ],
+      });
+
+      const para = renderToContainer(body).children[0] as HTMLElement;
+
+      expect(para.style.direction).toBe('rtl');
+    });
+  });
+
+  // ============================================================================
   // Strike-through text (strike attribute)
   // ============================================================================
   describe('strike-through text', () => {

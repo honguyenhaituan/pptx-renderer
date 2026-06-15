@@ -7,7 +7,7 @@ import { SafeXmlNode } from '../parser/XmlParser';
 import { RenderContext } from './RenderContext';
 import type { TextBody, TextParagraph, TextRun } from '../model/nodes/ShapeNode';
 import { PlaceholderInfo } from '../model/nodes/BaseNode';
-import { resolveColor, resolveColorToCss } from './StyleResolver';
+import { resolveColor, resolveColorToCss, resolveFill } from './StyleResolver';
 import { emuToPx, pctToDecimal, angleToDeg } from '../parser/units';
 import { isAllowedExternalUrl } from '../utils/urlSafety';
 import { getEffectiveBodyPrChild } from './TextBodyProperties';
@@ -103,6 +103,7 @@ function getPlaceholderLstStyle(phNode: SafeXmlNode): SafeXmlNode | undefined {
  */
 interface MergedParagraphStyle {
   align?: string;
+  rtl?: boolean;
   marginLeft?: number;
   textIndent?: number;
   lineHeight?: string;
@@ -133,6 +134,9 @@ function mergeParagraphProps(target: MergedParagraphStyle, pPr: SafeXmlNode): vo
 
   const algn = pPr.attr('algn');
   if (algn) target.align = algn;
+
+  const rtl = pPr.attr('rtl');
+  if (rtl !== undefined) target.rtl = rtl === '1' || rtl === 'true';
 
   const marL = pPr.numAttr('marL');
   if (marL !== undefined) target.marginLeft = emuToPx(marL);
@@ -289,6 +293,14 @@ interface MergedRunStyle {
   baseline?: number;
   /** CSS gradient string for text fill (from rPr > gradFill). */
   textGradientCss?: string;
+  /** CSS background for text fill (from rPr > pattFill). */
+  textPatternCss?: string;
+  /** CSS background color for a:highlight. */
+  highlightColor?: string;
+  /** Explicit underline CSS color from a:uFill. */
+  underlineColor?: string;
+  /** True when underline color should follow the effective text color. */
+  underlineFollowsText?: boolean;
   /** When true, text fill is transparent (a:noFill on rPr). */
   textNoFill?: boolean;
   /** Text outline width in px (from a:ln on rPr). */
@@ -328,10 +340,30 @@ function mergeRunProps(target: MergedRunStyle, rPr: SafeXmlNode, ctx: RenderCont
   if (strike !== undefined && strike !== 'noStrike') target.strikethrough = true;
   if (strike === 'noStrike') target.strikethrough = false;
 
+  const highlight = rPr.child('highlight');
+  if (highlight.exists()) {
+    target.highlightColor = resolveColorToCss(highlight, ctx);
+  }
+
+  const uFill = rPr.child('uFill');
+  if (uFill.exists()) {
+    const uSolidFill = uFill.child('solidFill');
+    if (uSolidFill.exists()) {
+      target.underlineColor = resolveColorToCss(uSolidFill, ctx);
+      target.underlineFollowsText = false;
+    }
+  }
+  const uFillTx = rPr.child('uFillTx');
+  if (uFillTx.exists()) {
+    target.underlineFollowsText = true;
+    target.underlineColor = undefined;
+  }
+
   // Color from solidFill or gradFill child
   const solidFill = rPr.child('solidFill');
   if (solidFill.exists()) {
     delete target.textGradientCss;
+    delete target.textPatternCss;
     delete target.textNoFill;
     const { color, alpha } = resolveColor(solidFill, ctx);
     const hex = color.startsWith('#') ? color : `#${color}`;
@@ -345,9 +377,18 @@ function mergeRunProps(target: MergedRunStyle, rPr: SafeXmlNode, ctx: RenderCont
   const gradFill = rPr.child('gradFill');
   if (gradFill.exists()) {
     delete target.color;
+    delete target.textPatternCss;
     delete target.textNoFill;
     const css = resolveGradientForText(gradFill, ctx);
     if (css) target.textGradientCss = css;
+  }
+  const pattFill = rPr.child('pattFill');
+  if (pattFill.exists()) {
+    delete target.color;
+    delete target.textGradientCss;
+    delete target.textNoFill;
+    const css = resolveFill(rPr, ctx);
+    if (css) target.textPatternCss = css;
   }
 
   // Font family. Office often writes separate Latin/East Asian typefaces in the
@@ -399,6 +440,7 @@ function mergeRunProps(target: MergedRunStyle, rPr: SafeXmlNode, ctx: RenderCont
   if (rPr.child('noFill').exists()) {
     delete target.color;
     delete target.textGradientCss;
+    delete target.textPatternCss;
     target.textNoFill = true;
   }
 
@@ -554,6 +596,29 @@ function resolveGradientForText(gradFill: SafeXmlNode, ctx: RenderContext): stri
     return `linear-gradient(${cssAngle.toFixed(1)}deg, ${stopsStr})`;
   }
   return `linear-gradient(180deg, ${stopsStr})`;
+}
+
+function applyClippedTextBackground(element: HTMLElement, css: string): void {
+  element.style.background = css;
+  // jsdom currently drops valid multi-layer background shorthand with
+  // background-size. Preserve the generated pattern as longhand declarations too.
+  if (!element.style.background && css.includes(' 0 0 / 8px 8px, ')) {
+    const layers = css.split(' 0 0 / 8px 8px, ');
+    const backgroundColor = layers[layers.length - 1]?.trim();
+    const backgroundImages = layers.slice(0, -1).map((layer) => layer.trim());
+    if (backgroundImages.length > 0) {
+      element.style.backgroundImage = backgroundImages.join(', ');
+      element.style.backgroundSize = backgroundImages.map(() => '8px 8px').join(', ');
+    }
+    if (backgroundColor) {
+      element.style.backgroundColor = backgroundColor;
+    }
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (element.style as any).webkitBackgroundClip = 'text';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (element.style as any).backgroundClip = 'text';
+  element.style.color = 'transparent';
 }
 
 // ---------------------------------------------------------------------------
@@ -744,9 +809,14 @@ export function renderTextBody(
         ctr: 'center',
         r: 'right',
         just: 'justify',
+        justLow: 'justify',
         dist: 'justify',
+        thaiDist: 'justify',
       };
       paraDiv.style.textAlign = alignMap[merged.align] || 'left';
+    }
+    if (merged.rtl !== undefined) {
+      paraDiv.style.direction = merged.rtl ? 'rtl' : 'ltr';
     }
     if (merged.marginLeft !== undefined) {
       paraDiv.style.paddingLeft = `${merged.marginLeft}px`;
@@ -1017,6 +1087,9 @@ export function renderTextBody(
       if (decorations.length > 0) {
         element.style.textDecoration = decorations.join(' ');
       }
+      if (runStyle.highlightColor) {
+        element.style.backgroundColor = runStyle.highlightColor;
+      }
 
       // Color priority: explicit run rPr > hlink theme color > cellTextColor (table style tcTxStyle) > fontRef (shape style) > inherited styles > black default
       // cellTextColor from table style overrides inherited cascade colors but yields to explicit run/paragraph solidFill/gradFill.
@@ -1057,15 +1130,19 @@ export function renderTextBody(
         // No explicit color from run/paragraph/style: use black so text does not inherit page CSS (e.g. body { color: #e0e0e0 })
         element.style.color = '#000000';
       }
+      if (runStyle.underlineFollowsText && effectiveColor) {
+        element.style.textDecorationColor = effectiveColor;
+      }
+      if (runStyle.underlineColor) {
+        element.style.textDecorationColor = runStyle.underlineColor;
+      }
 
       // Gradient text fill: use background-clip to paint text with gradient
       if (runStyle.textGradientCss) {
-        element.style.background = runStyle.textGradientCss;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (element.style as any).webkitBackgroundClip = 'text';
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (element.style as any).backgroundClip = 'text';
-        element.style.color = 'transparent';
+        applyClippedTextBackground(element, runStyle.textGradientCss);
+      }
+      if (runStyle.textPatternCss) {
+        applyClippedTextBackground(element, runStyle.textPatternCss);
       }
 
       // Text outline (a:ln on rPr) and noFill handling

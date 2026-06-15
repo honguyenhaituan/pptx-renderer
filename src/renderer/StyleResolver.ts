@@ -25,12 +25,12 @@ function buildColorCacheKey(colorNode: SafeXmlNode): string {
   const parts: string[] = [colorNode.localName, colorNode.attr('val') ?? ''];
   for (const child of colorNode.allChildren()) {
     const tag = child.localName;
-    const val = child.attr('val');
+    const val = child.attr('val') ?? child.attr('amt');
     if (tag) parts.push(`${tag}:${val ?? ''}`);
     // Include nested color children for wrapper nodes
     for (const grandchild of child.allChildren()) {
       const gtag = grandchild.localName;
-      const gval = grandchild.attr('val');
+      const gval = grandchild.attr('val') ?? grandchild.attr('amt');
       if (gtag) parts.push(`${gtag}:${gval ?? ''}`);
     }
   }
@@ -45,10 +45,16 @@ function collectModifiers(colorNode: SafeXmlNode): ColorModifier[] {
   const modifiers: ColorModifier[] = [];
   for (const child of colorNode.allChildren()) {
     const name = child.localName;
-    const val = child.numAttr('val');
+    const val = child.numAttr('val') ?? child.numAttr('amt');
     if (val !== undefined && name) {
       modifiers.push({ name, val });
-    } else if (name === 'inv' || name === 'gray') {
+    } else if (
+      name === 'inv' ||
+      name === 'gray' ||
+      name === 'comp' ||
+      name === 'gamma' ||
+      name === 'invGamma'
+    ) {
       modifiers.push({ name, val: 0 });
     }
   }
@@ -190,6 +196,21 @@ function resolveColorUncached(
     const hex = presetColorToHex(name) || '#000000';
     return applyColorModifiers(hex.replace('#', ''), collectModifiers(colorNode));
   }
+  if (selfTag === 'hslClr') {
+    const hue = (colorNode.numAttr('hue') ?? 0) / 60000;
+    const sat = (colorNode.numAttr('sat') ?? 0) / 100000;
+    const lum = (colorNode.numAttr('lum') ?? 0) / 100000;
+    const rgb = hslToRgb(hue, sat, lum);
+    const hex = rgbToHex(rgb.r, rgb.g, rgb.b).replace('#', '');
+    return applyColorModifiers(hex, collectModifiers(colorNode));
+  }
+  if (selfTag === 'scrgbClr') {
+    const r = Math.round(((colorNode.numAttr('r') ?? 0) / 100000) * 255);
+    const g = Math.round(((colorNode.numAttr('g') ?? 0) / 100000) * 255);
+    const b = Math.round(((colorNode.numAttr('b') ?? 0) / 100000) * 255);
+    const hex = rgbToHex(r, g, b).replace('#', '');
+    return applyColorModifiers(hex, collectModifiers(colorNode));
+  }
 
   return { color: '#000000', alpha: 1 };
 }
@@ -292,7 +313,11 @@ export function resolveFill(spPr: SafeXmlNode, ctx: RenderContext): string {
  * OOXML defines 40+ pattern presets. We support the most common ones and
  * fall back to a simple foreground/background 50% mix for unknown patterns.
  */
-function resolvePatternFill(pattFill: SafeXmlNode, ctx: RenderContext): string {
+function resolvePatternFill(
+  pattFill: SafeXmlNode,
+  ctx: RenderContext,
+  placeholderColorNode?: SafeXmlNode,
+): string {
   const preset = pattFill.attr('prst') ?? 'solid';
 
   // Foreground and background colors
@@ -301,13 +326,13 @@ function resolvePatternFill(pattFill: SafeXmlNode, ctx: RenderContext): string {
 
   const fgClr = pattFill.child('fgClr');
   if (fgClr.exists()) {
-    const { color, alpha } = resolveColor(fgClr, ctx);
+    const { color, alpha } = resolveColorWithPlaceholder(fgClr, ctx, placeholderColorNode);
     fg = colorToCss(color, alpha);
   }
 
   const bgClr = pattFill.child('bgClr');
   if (bgClr.exists()) {
-    const { color, alpha } = resolveColor(bgClr, ctx);
+    const { color, alpha } = resolveColorWithPlaceholder(bgClr, ctx, placeholderColorNode);
     bg = colorToCss(color, alpha);
   }
 
@@ -787,7 +812,7 @@ function resolveThemeFillReferenceFromList(
   }
 
   if (themeFill.localName === 'pattFill') {
-    return { fillCss: resolvePatternFill(themeFill, ctx), gradientFillData: null };
+    return { fillCss: resolvePatternFill(themeFill, ctx, fillRef), gradientFillData: null };
   }
 
   if (themeFill.localName === 'noFill') {

@@ -27,6 +27,7 @@ test/e2e/.pytest_cache/
 test/e2e/*.egg-info/
 test/e2e/.venv/
 test/e2e/reports/
+test/e2e/baselines/
 *.pyc
 
 

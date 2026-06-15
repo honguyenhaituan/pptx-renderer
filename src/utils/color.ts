@@ -288,6 +288,23 @@ function applyGray(hex: string): string {
   return rgbToHex(gray, gray, gray);
 }
 
+function applyComplement(hex: string): string {
+  const { r, g, b } = hexToRgb(hex);
+  const { h, s, l } = rgbToHsl(r, g, b);
+  const rgb = hslToRgb(h + 180, s, l);
+  return rgbToHex(rgb.r, rgb.g, rgb.b);
+}
+
+function applyGamma(hex: string): string {
+  const { r, g, b } = hexToRgb(hex);
+  return rgbToHex(srgbToLinear(r) * 255, srgbToLinear(g) * 255, srgbToLinear(b) * 255);
+}
+
+function applyInvGamma(hex: string): string {
+  const { r, g, b } = hexToRgb(hex);
+  return rgbToHex(linearToSrgb(r / 255), linearToSrgb(g / 255), linearToSrgb(b / 255));
+}
+
 /**
  * Convert OOXML alpha value (0-100000) to CSS opacity (0-1).
  * 100000 = fully opaque, 0 = fully transparent.
@@ -386,10 +403,20 @@ export function applyColorModifiers(
       case 'gray':
         color = applyGray(color);
         break;
+      case 'comp':
+        color = applyComplement(color);
+        break;
+      case 'gamma':
+        color = applyGamma(color);
+        break;
+      case 'invGamma':
+        color = applyInvGamma(color);
+        break;
       case 'alpha':
         alpha = applyAlpha(mod.val);
         break;
       case 'alphaMod':
+      case 'alphaModFix':
         alpha = Math.max(0, Math.min(1, alpha * (mod.val / 100000)));
         break;
       case 'alphaOff':

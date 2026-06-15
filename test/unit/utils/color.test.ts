@@ -412,6 +412,39 @@ describe('applyColorModifiers - OOXML channel and absolute color transforms', ()
 
     expect(result.color).toBe('#363636');
   });
+
+  it('handles alphaModFix as a multiplicative alpha adjustment', () => {
+    const result = applyColorModifiers('FF0000', [
+      { name: 'alpha', val: 80000 },
+      { name: 'alphaModFix', val: 50000 },
+    ]);
+
+    expect(result.alpha).toBeCloseTo(0.4, 5);
+  });
+
+  it('handles comp transform by rotating hue 180 degrees', () => {
+    const result = applyColorModifiers('FF0000', [{ name: 'comp', val: 0 }]);
+
+    expect(result.color).toBe('#00ffff');
+  });
+
+  it('handles a:comp prefixed transform names', () => {
+    const result = applyColorModifiers('00FF00', [{ name: 'a:comp', val: 0 }]);
+
+    expect(result.color).toBe('#ff00ff');
+  });
+
+  it('handles gamma transform', () => {
+    const result = applyColorModifiers('808080', [{ name: 'gamma', val: 0 }]);
+
+    expect(result.color).toBe('#373737');
+  });
+
+  it('handles invGamma transform', () => {
+    const result = applyColorModifiers('808080', [{ name: 'invGamma', val: 0 }]);
+
+    expect(result.color).toBe('#bcbcbc');
+  });
 });
 
 describe('presetColorToHex', () => {
