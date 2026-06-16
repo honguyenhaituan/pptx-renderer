@@ -252,40 +252,6 @@
         transform: scale(0.98);
       }
 
-      .mode-toggle {
-        display: none;
-        gap: 0;
-        border-radius: var(--radius);
-        overflow: hidden;
-        border: 1px solid var(--border);
-      }
-      .mode-toggle button {
-        background: var(--bg-raised);
-        color: var(--text-muted);
-        border: none;
-        padding: 5px 14px;
-        cursor: pointer;
-        font-family: var(--font);
-        font-size: 12px;
-        font-weight: 500;
-        transition: all 0.2s ease;
-      }
-      .mode-toggle button.active {
-        background: var(--blue-dim);
-        color: var(--blue);
-      }
-      .mode-toggle button:hover:not(.active) {
-        color: var(--text-dim);
-        background: var(--bg-overlay);
-      }
-      .mode-toggle button:focus-visible {
-        outline: 2px solid var(--blue);
-        outline-offset: -2px;
-      }
-      .mode-toggle button:active {
-        transform: scale(0.98);
-      }
-
       .stats {
         font-size: 12px;
         color: var(--text-muted);
@@ -566,163 +532,6 @@
         width: 100%;
       }
 
-      /* ── Slide transition ── */
-      @keyframes slide-in-right {
-        from {
-          transform: translateX(60px);
-          opacity: 0;
-        }
-        to {
-          transform: translateX(0);
-          opacity: 1;
-        }
-      }
-      @keyframes slide-in-left {
-        from {
-          transform: translateX(-60px);
-          opacity: 0;
-        }
-        to {
-          transform: translateX(0);
-          opacity: 1;
-        }
-      }
-      #pptx-container.slide-transition > * {
-        animation-duration: 0.25s;
-        animation-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
-        animation-fill-mode: both;
-      }
-      #pptx-container.slide-transition-next > * {
-        animation-name: slide-in-right;
-      }
-      #pptx-container.slide-transition-prev > * {
-        animation-name: slide-in-left;
-      }
-
-      /* ── Slide Navigation Strip ── */
-      .slide-nav-strip {
-        display: none;
-        justify-content: center;
-        align-items: center;
-        gap: 4px;
-        padding: 12px 28px;
-        background: var(--bg-raised);
-        border-top: 1px solid rgba(99, 102, 241, 0.35);
-        box-shadow: 0 -1px 0 rgba(0, 0, 0, 0.2);
-        position: sticky;
-        bottom: 0;
-        z-index: 99;
-        flex-wrap: wrap;
-      }
-      .slide-nav-strip.visible {
-        display: flex;
-      }
-      .slide-nav-dot {
-        width: 28px;
-        height: 6px;
-        border-radius: 3px;
-        background: rgba(108, 140, 255, 0.4);
-        border: none;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        padding: 0;
-        position: relative;
-      }
-      .slide-nav-dot:hover {
-        background: rgba(108, 140, 255, 0.7);
-        transform: scaleY(1.5);
-      }
-      .slide-nav-dot:focus-visible {
-        outline: 2px solid var(--accent);
-        outline-offset: 2px;
-      }
-      .slide-nav-dot:active {
-        transform: scaleY(1.2) scaleX(0.98);
-      }
-      .slide-nav-dot.active {
-        background: var(--accent);
-        width: 36px;
-        box-shadow: 0 0 8px var(--accent-glow);
-      }
-      .slide-nav-dot::after {
-        content: attr(data-label);
-        position: absolute;
-        bottom: 100%;
-        left: 50%;
-        transform: translateX(-50%);
-        background: var(--bg-overlay);
-        color: var(--text);
-        font-size: 11px;
-        font-weight: 500;
-        padding: 3px 8px;
-        border-radius: 4px;
-        white-space: nowrap;
-        margin-bottom: 6px;
-        pointer-events: none;
-        border: 1px solid var(--border);
-        opacity: 0;
-        transition: opacity 0.12s ease;
-      }
-      .slide-nav-dot:hover::after,
-      .slide-nav-dot:focus-visible::after {
-        opacity: 1;
-      }
-
-      /* ── Toolbar slide nav controls ── */
-      .slide-nav-controls {
-        display: none;
-        align-items: center;
-        gap: 6px;
-      }
-      .slide-nav-controls.visible {
-        display: inline-flex;
-      }
-      .slide-nav-controls button {
-        background: var(--bg-raised);
-        color: var(--text);
-        border: 1px solid var(--border);
-        width: 30px;
-        height: 30px;
-        border-radius: var(--radius);
-        cursor: pointer;
-        font-size: 14px;
-        font-family: var(--font);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.2s ease;
-        padding: 0;
-      }
-      .slide-nav-controls button:hover:not(:disabled) {
-        background: var(--blue-dim);
-        border-color: var(--blue);
-        color: #fff;
-      }
-      .slide-nav-controls button:focus-visible {
-        outline: 2px solid var(--blue);
-        outline-offset: 2px;
-      }
-      .slide-nav-controls button:active:not(:disabled) {
-        transform: scale(0.95);
-      }
-      .slide-nav-controls button:disabled {
-        opacity: 0.25;
-        cursor: not-allowed;
-      }
-      #slide-indicator {
-        font-size: 12px;
-        font-weight: 600;
-        color: var(--text-dim);
-        min-width: 50px;
-        text-align: center;
-        font-variant-numeric: tabular-nums;
-      }
-
-      /* ── Hide Renderer.ts built-in nav (slide mode) ── */
-      .hide-builtin-nav > div:last-child {
-        display: none !important;
-      }
-
       /* ── Empty State ── */
       .empty-state {
         min-height: calc(100vh - 220px);
@@ -871,8 +680,56 @@
         font-size: 14px;
         color: var(--text-dim);
         max-width: 440px;
-        margin-bottom: 28px;
+        margin-bottom: 20px;
         line-height: 1.6;
+      }
+      .empty-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 28px;
+      }
+      .empty-action-btn {
+        min-height: 38px;
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+        padding: 8px 14px;
+        cursor: pointer;
+        font-family: var(--font);
+        font-size: 13px;
+        font-weight: 600;
+        transition:
+          transform 0.2s ease,
+          border-color 0.2s ease,
+          background 0.2s ease,
+          color 0.2s ease;
+      }
+      .empty-action-btn.primary {
+        border-color: var(--accent);
+        background: var(--accent);
+        color: #fff;
+      }
+      .empty-action-btn.secondary {
+        background: var(--bg-raised);
+        color: var(--blue);
+      }
+      .empty-action-btn:hover {
+        transform: translateY(-1px);
+      }
+      .empty-action-btn.primary:hover {
+        background: #ff536d;
+      }
+      .empty-action-btn.secondary:hover {
+        border-color: var(--blue);
+        background: var(--blue-dim);
+        color: #fff;
+      }
+      .empty-action-btn:focus-visible {
+        outline: 2px solid var(--blue);
+        outline-offset: 2px;
+      }
+      .empty-action-btn:active {
+        transform: scale(0.98);
       }
       .empty-features {
         display: flex;
@@ -1115,12 +972,12 @@
           margin-right: auto;
           margin-left: auto;
         }
+        .empty-actions {
+          justify-content: center;
+        }
         .empty-features {
           justify-content: center;
           gap: 16px;
-        }
-        .slide-nav-strip {
-          padding: 8px 16px;
         }
       }
     </style>
@@ -1165,15 +1022,6 @@
       <span class="sample-label">Try</span>
       <button class="sample-btn" data-file="samples/chart-and-complex.pptx">Charts & Shapes</button>
       <button class="clear-btn" id="clear-btn">Clear</button>
-      <div class="mode-toggle" id="mode-toggle">
-        <button class="active" data-mode="list">List</button>
-        <button data-mode="slide">Slide</button>
-      </div>
-      <div class="slide-nav-controls" id="slide-nav-controls">
-        <button id="btn-prev" title="Previous slide (←)">&#8592;</button>
-        <span id="slide-indicator">1 / 1</span>
-        <button id="btn-next" title="Next slide (→)">&#8594;</button>
-      </div>
       <div class="stats" id="stats">
         <span id="file-name" class="stat-item"></span>
         <span id="stat-sep-1" class="stat-sep" style="display: none">/</span>
@@ -1240,6 +1088,14 @@
                 Inspect slides, search text, and browse thumbnails directly in the browser. Files
                 stay local.
               </p>
+              <div class="empty-actions">
+                <button class="empty-action-btn primary" id="empty-upload-btn" type="button">
+                  Upload PPTX
+                </button>
+                <button class="empty-action-btn secondary" id="empty-sample-btn" type="button">
+                  Open sample
+                </button>
+              </div>
               <div class="empty-features">
                 <div class="empty-feature">
                   <span class="empty-feature-icon">&#9638;</span>Shapes
@@ -1260,8 +1116,6 @@
       </div>
     </div>
 
-    <div class="slide-nav-strip" id="slide-nav-strip"></div>
-
     <div class="footer">
       <a href="https://github.com/aiden0z/pptx-renderer">@aiden0z/pptx-renderer</a>
       &mdash; TypeScript library that parses and renders PPTX as HTML/SVG.
@@ -1270,7 +1124,7 @@
     </div>
 
     <script type="module">
-      import { PptxViewer } from '../src/index.ts';
+      import { PptxViewer, RECOMMENDED_ZIP_LIMITS } from '../src/index.ts';
 
       const container = document.getElementById('pptx-container');
       const fileInput = document.getElementById('file-input');
@@ -1282,13 +1136,7 @@
       const fileSizeEl = document.getElementById('file-size');
       const dropOverlay = document.getElementById('drop-overlay');
       const clearBtn = document.getElementById('clear-btn');
-      const modeToggle = document.getElementById('mode-toggle');
       const shortcutHint = document.getElementById('shortcut-hint');
-      const slideNavStrip = document.getElementById('slide-nav-strip');
-      const slideNavControls = document.getElementById('slide-nav-controls');
-      const slideIndicator = document.getElementById('slide-indicator');
-      const btnPrev = document.getElementById('btn-prev');
-      const btnNext = document.getElementById('btn-next');
       const searchInput = document.getElementById('search-input');
       const searchSummary = document.getElementById('search-summary');
       const searchResultsEl = document.getElementById('search-results');
@@ -1305,7 +1153,6 @@
 
       let viewer = null;
       let cachedBuffer = null;
-      let currentMode = 'list';
       let totalSlides = 0;
       let thumbnailObserver = null;
       let searchMatches = [];
@@ -1313,6 +1160,24 @@
       let activeSearchHighlight = null;
       let searchHighlightTimer = 0;
       const thumbnailHandles = new Map();
+      const demoListOptions = {
+        windowed: true,
+        batchSize: 4,
+        initialSlides: 4,
+        overscanViewport: 1.5,
+      };
+
+      function createViewerOpenOptions() {
+        return {
+          renderMode: 'list',
+          zipLimits: RECOMMENDED_ZIP_LIMITS,
+          lazySlides: true,
+          lazyMedia: true,
+          listOptions: demoListOptions,
+          onSlideError: (idx, err) => console.error(`Slide ${idx + 1} error:`, err),
+          onNodeError: (nodeId, err) => console.warn(`Node ${nodeId} error:`, err),
+        };
+      }
 
       // Keyboard shortcut hint
       const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
@@ -1357,84 +1222,13 @@
 
       function showLoaded(show) {
         clearBtn.style.display = show ? 'inline-block' : 'none';
-        modeToggle.style.display = show ? 'inline-flex' : 'none';
         searchInput.disabled = !show;
         searchMatchCase.disabled = !show;
-        updateSlideControls();
       }
 
-      function updateSlideControls() {
-        const isSlide = currentMode === 'slide' && totalSlides > 0 && cachedBuffer;
-        slideNavControls.classList.toggle('visible', !!isSlide);
-        container.classList.toggle('hide-builtin-nav', !!isSlide);
-        if (isSlide) {
-          const idx = viewer ? viewer.currentSlideIndex : 0;
-          slideIndicator.textContent = `${idx + 1} / ${totalSlides}`;
-          btnPrev.disabled = idx <= 0;
-          btnNext.disabled = idx >= totalSlides - 1;
-        }
-      }
-
-      function goToSlideIdx(idx) {
+      function goToSlideIndex(idx) {
         if (!viewer || idx < 0 || idx >= totalSlides) return;
-        const prev = viewer.currentSlideIndex;
-        if (idx === prev) return;
-        if (currentMode === 'slide') {
-          const dir = idx > prev ? 'next' : 'prev';
-          container.classList.remove(
-            'slide-transition',
-            'slide-transition-next',
-            'slide-transition-prev',
-          );
-          viewer.goToSlide(idx);
-          // Force reflow so the animation restarts cleanly
-          void container.offsetWidth;
-          container.classList.add('slide-transition', `slide-transition-${dir}`);
-          container.addEventListener(
-            'animationend',
-            () =>
-              container.classList.remove(
-                'slide-transition',
-                'slide-transition-next',
-                'slide-transition-prev',
-              ),
-            { once: true },
-          );
-        } else {
-          viewer.goToSlide(idx);
-        }
-        // Nav strip/controls are updated via the slidechange event listener
-      }
-
-      function buildNavStrip(count, activeIndex) {
-        slideNavStrip.innerHTML = '';
-        totalSlides = count;
-        if (count <= 0) {
-          slideNavStrip.classList.remove('visible');
-          return;
-        }
-        slideNavStrip.classList.add('visible');
-        for (let i = 0; i < count; i++) {
-          const dot = document.createElement('button');
-          dot.className = 'slide-nav-dot' + (i === activeIndex ? ' active' : '');
-          dot.dataset.label = 'Slide ' + (i + 1);
-          dot.addEventListener('click', () => {
-            if (currentMode === 'slide' && viewer) {
-              goToSlideIdx(i);
-            } else {
-              const target = container.querySelector(`[data-slide-index="${i}"]`);
-              if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              updateNavStrip(i);
-            }
-          });
-          slideNavStrip.appendChild(dot);
-        }
-      }
-
-      function updateNavStrip(activeIndex) {
-        const dots = slideNavStrip.querySelectorAll('.slide-nav-dot');
-        dots.forEach((d, i) => d.classList.toggle('active', i === activeIndex));
-        markActiveThumbnail(activeIndex);
+        viewer.goToSlide(idx, { behavior: 'smooth', block: 'center' });
       }
 
       const emptyHTML = `
@@ -1452,17 +1246,30 @@
             </div>
             <div class="empty-copy">
               <div class="empty-kicker">Browser renderer</div>
-              <h2>Open a deck or launch the sample</h2>
-              <p>Inspect slides, search text, and browse thumbnails directly in the browser. Files stay local.</p>
-              <div class="empty-features">
-                <div class="empty-feature"><span class="empty-feature-icon">&#9638;</span>Shapes</div>
-                <div class="empty-feature"><span class="empty-feature-icon">&#128200;</span>Charts</div>
+               <h2>Open a deck or launch the sample</h2>
+               <p>Inspect slides, search text, and browse thumbnails directly in the browser. Files stay local.</p>
+               <div class="empty-actions">
+                 <button class="empty-action-btn primary" id="empty-upload-btn" type="button">Upload PPTX</button>
+                 <button class="empty-action-btn secondary" id="empty-sample-btn" type="button">Open sample</button>
+               </div>
+               <div class="empty-features">
+                 <div class="empty-feature"><span class="empty-feature-icon">&#9638;</span>Shapes</div>
+                 <div class="empty-feature"><span class="empty-feature-icon">&#128200;</span>Charts</div>
                 <div class="empty-feature"><span class="empty-feature-icon">&#128196;</span>Tables</div>
                 <div class="empty-feature"><span class="empty-feature-icon">&#127912;</span>Themes</div>
               </div>
             </div>
           </div>
         </div>`;
+
+      function bindEmptyActions() {
+        const emptyUploadBtn = document.getElementById('empty-upload-btn');
+        const emptySampleBtn = document.getElementById('empty-sample-btn');
+        emptyUploadBtn?.addEventListener('click', () => fileInput.click());
+        emptySampleBtn?.addEventListener('click', () =>
+          loadSample('samples/chart-and-complex.pptx'),
+        );
+      }
 
       function resetToEmpty() {
         cleanupThumbnails();
@@ -1474,10 +1281,8 @@
         resetSidePanel();
         showLoaded(false);
         showError('');
-        slideNavStrip.classList.remove('visible');
-        slideNavStrip.innerHTML = '';
-        slideNavControls.classList.remove('visible');
         container.innerHTML = emptyHTML;
+        bindEmptyActions();
       }
 
       async function renderBuffer(buffer, label, fileBytes) {
@@ -1492,15 +1297,10 @@
           if (viewer) viewer.destroy();
           cachedBuffer = buffer;
           const t0 = performance.now();
-          viewer = await PptxViewer.open(buffer, container, {
-            renderMode: currentMode,
-            onSlideError: (idx, err) => console.error(`Slide ${idx + 1} error:`, err),
-            onNodeError: (nodeId, err) => console.warn(`Node ${nodeId} error:`, err),
-          });
-          // Use typed on() helper: update nav strip/controls on every slidechange
+          viewer = await PptxViewer.open(buffer, container, createViewerOpenOptions());
+          // Use typed on() helper: keep thumbnails and search overlays in sync.
           viewer.on('slidechange', (e) => {
-            updateNavStrip(e.detail.index);
-            updateSlideControls();
+            markActiveThumbnail(e.detail.index);
             const activeResult = searchMatches[activeSearchIndex];
             if (activeResult && activeResult.slideIndex === e.detail.index) {
               scheduleActiveSearchHighlight(activeResult);
@@ -1509,6 +1309,7 @@
             }
           });
           const elapsed = performance.now() - t0;
+          totalSlides = viewer.slideCount;
 
           showStats(
             label,
@@ -1517,7 +1318,6 @@
             elapsed.toFixed(0),
           );
           showLoaded(true);
-          buildNavStrip(viewer.slideCount, viewer.currentSlideIndex);
           searchSummary.textContent = 'Ready';
           setupThumbnails();
         } catch (e) {
@@ -1527,7 +1327,6 @@
           container.innerHTML = `<div class="empty-state fade-in"><h2 style="color:var(--accent)">Failed to render</h2><p>${escapeHtml(errMsg)}</p></div>`;
           showLoaded(false);
           resetSidePanel();
-          slideNavStrip.classList.remove('visible');
         }
       }
 
@@ -1619,13 +1418,7 @@
           item.type = 'button';
           item.className = 'thumbnail-item';
           item.dataset.slideIndex = String(i);
-          item.addEventListener('click', () => {
-            if (currentMode === 'slide') {
-              goToSlideIdx(i);
-            } else {
-              viewer.goToSlide(i, { behavior: 'smooth', block: 'center' });
-            }
-          });
+          item.addEventListener('click', () => goToSlideIndex(i));
 
           const label = document.createElement('span');
           label.className = 'thumbnail-label';
@@ -1757,11 +1550,7 @@
         updateSearchControls();
         const activeItem = searchResultsEl.querySelector('.search-result.active');
         activeItem?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        if (currentMode === 'slide') {
-          goToSlideIdx(result.slideIndex);
-        } else {
-          viewer.goToSlide(result.slideIndex, { behavior: 'smooth', block: 'center' });
-        }
+        goToSlideIndex(result.slideIndex);
         scheduleActiveSearchHighlight(result);
       }
 
@@ -1796,36 +1585,9 @@
         }
       }
 
-      async function switchMode(mode) {
-        if (mode === currentMode || !cachedBuffer) return;
-        currentMode = mode;
-        modeToggle.querySelectorAll('button').forEach((b) => {
-          b.classList.toggle('active', b.dataset.mode === mode);
-        });
-        cleanupThumbnails();
-        if (viewer) viewer.destroy();
-        viewer = await PptxViewer.open(cachedBuffer, container, {
-          renderMode: currentMode,
-          onSlideError: (idx, err) => console.error(`Slide ${idx + 1} error:`, err),
-          onNodeError: (nodeId, err) => console.warn(`Node ${nodeId} error:`, err),
-        });
-        viewer.on('slidechange', (e) => {
-          updateNavStrip(e.detail.index);
-          updateSlideControls();
-          const activeResult = searchMatches[activeSearchIndex];
-          if (activeResult && activeResult.slideIndex === e.detail.index) {
-            scheduleActiveSearchHighlight(activeResult);
-          } else {
-            resetActiveSearchOverlay();
-          }
-        });
-        buildNavStrip(totalSlides, viewer.currentSlideIndex);
-        updateSlideControls();
-        setupThumbnails();
-        runSearch();
-      }
-
       // ── Events ──
+
+      bindEmptyActions();
 
       fileInput.addEventListener('change', (e) => {
         if (e.target.files[0]) handleFile(e.target.files[0]);
@@ -1838,21 +1600,10 @@
 
       clearBtn.addEventListener('click', resetToEmpty);
 
-      modeToggle.querySelectorAll('button').forEach((btn) => {
-        btn.addEventListener('click', () => switchMode(btn.dataset.mode));
-      });
-
       searchInput.addEventListener('input', runSearch);
       searchMatchCase.addEventListener('change', runSearch);
       searchPrev.addEventListener('click', () => activateSearchResult(activeSearchIndex - 1));
       searchNext.addEventListener('click', () => activateSearchResult(activeSearchIndex + 1));
-
-      btnPrev.addEventListener('click', () =>
-        goToSlideIdx(viewer ? viewer.currentSlideIndex - 1 : 0),
-      );
-      btnNext.addEventListener('click', () =>
-        goToSlideIdx(viewer ? viewer.currentSlideIndex + 1 : 0),
-      );
 
       // Keyboard: Ctrl+O / Cmd+O to open, Arrow keys for slide navigation
       document.addEventListener('keydown', (e) => {
@@ -1865,10 +1616,10 @@
 
         if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
           e.preventDefault();
-          goToSlideIdx(viewer.currentSlideIndex - 1);
+          goToSlideIndex(viewer.currentSlideIndex - 1);
         } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
           e.preventDefault();
-          goToSlideIdx(viewer.currentSlideIndex + 1);
+          goToSlideIndex(viewer.currentSlideIndex + 1);
         }
       });
 

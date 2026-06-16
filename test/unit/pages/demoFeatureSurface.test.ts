@@ -81,6 +81,33 @@ describe('public demo feature surface', () => {
     }
   });
 
+  it('offers primary empty-state actions in the public demo', () => {
+    expect(demoHtml).toContain('id="empty-upload-btn"');
+    expect(demoHtml).toContain('id="empty-sample-btn"');
+    expect(demoHtml).toContain('emptyUploadBtn?.addEventListener');
+    expect(demoHtml).toContain('emptySampleBtn?.addEventListener');
+    expect(demoHtml).toContain('fileInput.click()');
+    expect(demoHtml).toContain("loadSample('samples/chart-and-complex.pptx')");
+  });
+
+  it('keeps the public demo in list mode instead of exposing a broken mode toggle', () => {
+    expect(demoHtml).not.toContain('id="mode-toggle"');
+    expect(demoHtml).not.toContain('data-mode="slide"');
+    expect(demoHtml).not.toContain('function switchMode');
+    expect(demoHtml).not.toContain('currentMode');
+    expect(demoHtml).toContain("renderMode: 'list'");
+  });
+
+  it('uses large-deck viewer options in the public demo', () => {
+    expect(demoHtml).toContain('RECOMMENDED_ZIP_LIMITS');
+    expect(demoHtml).toContain('function createViewerOpenOptions()');
+    expect(demoHtml).toContain('zipLimits: RECOMMENDED_ZIP_LIMITS');
+    expect(demoHtml).toContain('lazySlides: true');
+    expect(demoHtml).toContain('lazyMedia: true');
+    expect(demoHtml).toContain('listOptions: demoListOptions');
+    expect(demoHtml).toContain('PptxViewer.open(buffer, container, createViewerOpenOptions())');
+  });
+
   it('serves the public demo sample from the docs example source deck', () => {
     expect(existsSync(docsExampleSamplePath)).toBe(true);
     expect(existsSync(duplicatePublicSamplePath)).toBe(false);
