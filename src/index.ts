@@ -19,8 +19,12 @@ export { parseZip, parseZipLazyMedia, RECOMMENDED_ZIP_LIMITS } from './parser/Zi
 export type { ZipParseLimits } from './parser/ZipParser';
 export type { MediaResolver, ResolvedMedia } from './utils/media';
 
-export { buildPresentation } from './model/Presentation';
-export type { PresentationData } from './model/Presentation';
+export {
+  buildPresentation,
+  materializeAllSlideNodes,
+  materializeSlideNodes,
+} from './model/Presentation';
+export type { BuildPresentationOptions, PresentationData } from './model/Presentation';
 
 export { serializePresentation } from './export/serializePresentation';
 export type {

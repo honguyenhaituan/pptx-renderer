@@ -37,6 +37,8 @@ export interface ViewerOptions {
   zipLimits?: ZipParseLimits;
   /** Decode embedded media on demand instead of during ZIP parsing. Default `false`. */
   lazyMedia?: boolean;
+  /** Parse slide shape/table/chart nodes on demand instead of during model build. Default `false`. */
+  lazySlides?: boolean;
   /** Optional pdfjs URLs for EMF-embedded PDF fallback rendering. Use `false` to disable. */
   pdfjs?: PdfjsConfig;
   onSlideChange?: (index: number) => void;
@@ -272,6 +274,7 @@ export class PptxViewer extends EventTarget {
       listOptions?: ListRenderOptions;
       signal?: AbortSignal;
       lazyMedia?: boolean;
+      lazySlides?: boolean;
     },
   ): Promise<void> {
     const signal = options?.signal;
@@ -295,7 +298,10 @@ export class PptxViewer extends EventTarget {
       : await parseZip(buffer, this.viewerOptions.zipLimits);
     checkAborted();
 
-    const presentation = buildPresentation(files);
+    const useLazySlides = options?.lazySlides ?? this.viewerOptions.lazySlides ?? false;
+    const presentation = useLazySlides
+      ? buildPresentation(files, { lazySlides: true })
+      : buildPresentation(files);
     checkAborted();
 
     this.load(presentation);
@@ -322,6 +328,7 @@ export class PptxViewer extends EventTarget {
       listOptions?: ListRenderOptions;
       signal?: AbortSignal;
       lazyMedia?: boolean;
+      lazySlides?: boolean;
     },
   ): Promise<PptxViewer> {
     const viewer = new PptxViewer(container, options);
@@ -330,6 +337,7 @@ export class PptxViewer extends EventTarget {
       listOptions: options?.listOptions,
       signal: options?.signal,
       lazyMedia: options?.lazyMedia,
+      lazySlides: options?.lazySlides,
     });
     return viewer;
   }

@@ -34,6 +34,7 @@ class BenchmarkResult:
     case_name: str = ""
     strategy: str = ""
     lazy_media: bool = False
+    lazy_slides: bool = False
     bytes: int = 0
     slides: int = 0
     nodes: int = 0
@@ -64,6 +65,7 @@ class BenchmarkResult:
             case_name=str(payload.get("caseName", "")),
             strategy=str(payload.get("strategy", "")),
             lazy_media=bool(payload.get("lazyMedia", False)),
+            lazy_slides=bool(payload.get("lazySlides", False)),
             bytes=int(payload.get("bytes", 0)),
             slides=int(payload.get("slides", 0)),
             nodes=int(payload.get("nodes", 0)),
@@ -112,6 +114,7 @@ def _result_to_json(result: BenchmarkResult) -> dict[str, Any]:
         "caseName": raw.pop("case_name"),
         "strategy": raw.pop("strategy"),
         "lazyMedia": raw.pop("lazy_media"),
+        "lazySlides": raw.pop("lazy_slides"),
         "bytes": raw.pop("bytes"),
         "slides": raw.pop("slides"),
         "nodes": raw.pop("nodes"),
@@ -158,8 +161,8 @@ def build_markdown_report(results: Iterable[BenchmarkResult], *, server_url: str
         f"- Generated: {datetime.now().isoformat(timespec='seconds')}",
         f"- Server: `{server_url}`",
         "",
-        "| Case | Strategy | Lazy Media | Slides | Nodes | PPTX Size | Fetch ms | Parse ms | Build ms | First Slide ms | Render ms | 2x RAF ms | Heap Used | Media Bytes | Blob URLs | DOM Elements | Mounted |",
-        "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Case | Strategy | Lazy Media | Lazy Slides | Slides | Nodes | PPTX Size | Fetch ms | Parse ms | Build ms | First Slide ms | Render ms | 2x RAF ms | Heap Used | Media Bytes | Blob URLs | DOM Elements | Mounted |",
+        "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for item in rows:
         lines.append(
@@ -169,6 +172,7 @@ def build_markdown_report(results: Iterable[BenchmarkResult], *, server_url: str
                     item.case_name,
                     item.strategy,
                     "yes" if item.lazy_media else "no",
+                    "yes" if item.lazy_slides else "no",
                     str(item.slides),
                     str(item.nodes),
                     format_bytes(item.bytes),
@@ -327,6 +331,7 @@ async def run_browser_benchmark(
     viewport_width: int,
     viewport_height: int,
     lazy_media: bool,
+    lazy_slides: bool,
 ) -> list[BenchmarkResult]:
     try:
         from playwright.async_api import async_playwright
@@ -354,6 +359,7 @@ async def run_browser_benchmark(
                     viewport_width=viewport_width,
                     viewport_height=viewport_height,
                     lazy_media=lazy_media,
+                    lazy_slides=lazy_slides,
                 )
                 result = BenchmarkResult.from_browser_payload(payload)
                 results.append(result)
@@ -371,11 +377,12 @@ async def run_single_browser_case(
     viewport_width: int,
     viewport_height: int,
     lazy_media: bool,
+    lazy_slides: bool,
 ) -> dict[str, Any]:
     await page.goto(f"{server_url}/test/pages/index.html")
     return await page.evaluate(
         """
-        async ({ caseName, listOptions, viewportWidth, viewportHeight, lazyMedia }) => {
+        async ({ caseName, listOptions, viewportWidth, viewportHeight, lazyMedia, lazySlides }) => {
           const mod = await import('/src/index.ts');
           document.body.innerHTML = '';
           document.body.style.margin = '0';
@@ -389,7 +396,9 @@ async def run_single_browser_case(
             ? await mod.parseZipLazyMedia(buffer, mod.RECOMMENDED_ZIP_LIMITS)
             : await mod.parseZip(buffer, mod.RECOMMENDED_ZIP_LIMITS);
           const tParse = performance.now();
-          const pres = mod.buildPresentation(files);
+          const pres = lazySlides
+            ? mod.buildPresentation(files, { lazySlides: true })
+            : mod.buildPresentation(files);
           const tBuild = performance.now();
 
           const container = document.createElement('div');
@@ -450,6 +459,7 @@ async def run_single_browser_case(
               caseName,
               strategy: listOptions.windowed ? 'windowed' : 'full',
               lazyMedia,
+              lazySlides,
               sourcePath,
               bytes: buffer.byteLength,
               slides: pres.slides.length,
@@ -490,6 +500,7 @@ async def run_single_browser_case(
             "viewportWidth": viewport_width,
             "viewportHeight": viewport_height,
             "lazyMedia": lazy_media,
+            "lazySlides": lazy_slides,
         },
     )
 
@@ -533,6 +544,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--viewport-width", type=int, default=1440)
     parser.add_argument("--viewport-height", type=int, default=900)
     parser.add_argument("--lazy-media", action="store_true")
+    parser.add_argument("--lazy-slides", action="store_true")
     parser.add_argument("--start-server", action="store_true")
     parser.add_argument("--compare-before", type=Path)
     parser.add_argument("--compare-after", type=Path)
@@ -579,6 +591,7 @@ async def async_main() -> None:
             viewport_width=args.viewport_width,
             viewport_height=args.viewport_height,
             lazy_media=args.lazy_media,
+            lazy_slides=args.lazy_slides,
         )
 
         args.output_dir.mkdir(parents=True, exist_ok=True)

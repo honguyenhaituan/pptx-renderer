@@ -11,6 +11,8 @@ import {
   parseZipLazyMedia,
   RECOMMENDED_ZIP_LIMITS,
   buildPresentation,
+  materializeAllSlideNodes,
+  materializeSlideNodes,
   serializePresentation,
   buildTextIndex,
   searchPresentation,
@@ -30,6 +32,7 @@ import type {
   PreviewInput,
   FitMode,
   ZipParseLimits,
+  BuildPresentationOptions,
   PresentationData,
   SerializedPresentation,
   SerializedSlide,
@@ -84,6 +87,7 @@ type _TextSearchOptionsCompileCheck = TextSearchOptions;
 type _TextSearchResultCompileCheck = TextSearchResult;
 type _MediaResolverCompileCheck = MediaResolver;
 type _ResolvedMediaCompileCheck = ResolvedMedia;
+type _BuildPresentationOptionsCompileCheck = BuildPresentationOptions;
 
 describe('package exports', () => {
   it('exports PptxViewer class', () => {
@@ -112,6 +116,11 @@ describe('package exports', () => {
 
   it('exports buildPresentation function', () => {
     expect(typeof buildPresentation).toBe('function');
+  });
+
+  it('exports lazy slide materialization helpers', () => {
+    expect(typeof materializeSlideNodes).toBe('function');
+    expect(typeof materializeAllSlideNodes).toBe('function');
   });
 
   it('exports serializePresentation function', () => {

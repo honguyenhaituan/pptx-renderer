@@ -31,7 +31,13 @@ vi.mock('../../../src/renderer/SlideRenderer', () => ({
   renderSlide: vi.fn(() => {
     const el = document.createElement('div');
     el.className = 'mock-slide';
-    return { element: el, dispose: vi.fn(), [Symbol.dispose]() { this.dispose(); } };
+    return {
+      element: el,
+      dispose: vi.fn(),
+      [Symbol.dispose]() {
+        this.dispose();
+      },
+    };
   }),
 }));
 
@@ -119,6 +125,14 @@ describe('PptxViewer.open() static factory', () => {
     expect(buildPresentation).toHaveBeenCalledWith({ lazy: true });
   });
 
+  it('passes lazySlides to buildPresentation when enabled', async () => {
+    const container = document.createElement('div');
+
+    await PptxViewer.open(new ArrayBuffer(4), container, { lazySlides: true });
+
+    expect(buildPresentation).toHaveBeenCalledWith({}, { lazySlides: true });
+  });
+
   it('accepts Uint8Array input', async () => {
     const container = document.createElement('div');
     const viewer = await PptxViewer.open(new Uint8Array([1, 2, 3]), container);
@@ -169,9 +183,9 @@ describe('viewer.open() instance method', () => {
     controller.abort();
     const viewer = new PptxViewer(document.createElement('div'));
 
-    await expect(
-      viewer.open(new ArrayBuffer(4), { signal: controller.signal }),
-    ).rejects.toThrow('Preview aborted');
+    await expect(viewer.open(new ArrayBuffer(4), { signal: controller.signal })).rejects.toThrow(
+      'Preview aborted',
+    );
   });
 
   it('static open() still works', async () => {

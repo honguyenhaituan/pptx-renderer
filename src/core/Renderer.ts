@@ -19,6 +19,8 @@ export interface RendererOptions {
   zipLimits?: ZipParseLimits;
   /** Decode embedded media on demand instead of during ZIP parsing. Default `false`. */
   lazyMedia?: boolean;
+  /** Parse slide shape/table/chart nodes on demand instead of during model build. Default `false`. */
+  lazySlides?: boolean;
   /** Optional pdfjs URLs for EMF-embedded PDF fallback rendering. Use `false` to disable. */
   pdfjs?: PdfjsConfig;
   /**
@@ -58,6 +60,7 @@ export class PptxRenderer extends PptxViewer {
   private rendererListOptions: ListRenderOptions;
   private rendererZipLimits?: ZipParseLimits;
   private rendererLazyMedia: boolean;
+  private rendererLazySlides: boolean;
   private previewAbortController: AbortController | null = null;
 
   constructor(container: HTMLElement, options: RendererOptions = {}) {
@@ -68,6 +71,7 @@ export class PptxRenderer extends PptxViewer {
       scrollContainer: options.scrollContainer,
       zipLimits: options.zipLimits,
       lazyMedia: options.lazyMedia,
+      lazySlides: options.lazySlides,
       pdfjs: options.pdfjs,
       onSlideChange: options.onSlideChange,
       onSlideRendered: options.onSlideRendered,
@@ -78,6 +82,7 @@ export class PptxRenderer extends PptxViewer {
     this.rendererMode = options.mode ?? 'list';
     this.rendererZipLimits = options.zipLimits;
     this.rendererLazyMedia = options.lazyMedia === true;
+    this.rendererLazySlides = options.lazySlides === true;
     this.rendererListOptions = {
       windowed: options.listMountStrategy === 'windowed',
       batchSize: options.listRenderBatchSize,
@@ -123,7 +128,9 @@ export class PptxRenderer extends PptxViewer {
       : await parseZip(buffer, this.rendererZipLimits);
     checkAborted();
 
-    const presentation = buildPresentation(files);
+    const presentation = this.rendererLazySlides
+      ? buildPresentation(files, { lazySlides: true })
+      : buildPresentation(files);
     checkAborted();
 
     this.load(presentation);

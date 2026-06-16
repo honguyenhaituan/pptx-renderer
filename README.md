@@ -59,11 +59,12 @@ const viewer = await PptxViewer.open(await resp.arrayBuffer(), container, {
 });
 ```
 
-For large, media-heavy decks, combine windowed mounting with on-demand media decoding:
+For large decks, combine windowed mounting with on-demand slide parsing and media decoding:
 
 ```ts
 const viewer = await PptxViewer.open(buffer, container, {
   zipLimits: RECOMMENDED_ZIP_LIMITS,
+  lazySlides: true,
   lazyMedia: true,
   listOptions: { windowed: true, initialSlides: 4, batchSize: 4 },
 });
@@ -126,8 +127,8 @@ viewer.load(presentation);
 await viewer.renderList({ windowed: true, batchSize: 8 });
 ```
 
-To delay media decompression until a rendered slide actually needs it, use
-`parseZipLazyMedia()` instead of `parseZip()`:
+To delay both media decompression and slide node parsing until rendered slides actually need
+them, use `parseZipLazyMedia()` and pass `{ lazySlides: true }` to `buildPresentation()`:
 
 ```ts
 import {
@@ -138,7 +139,7 @@ import {
 } from '@aiden0z/pptx-renderer';
 
 const files = await parseZipLazyMedia(arrayBuffer, RECOMMENDED_ZIP_LIMITS);
-const presentation = buildPresentation(files);
+const presentation = buildPresentation(files, { lazySlides: true });
 
 const viewer = new PptxViewer(container);
 viewer.load(presentation);
@@ -173,6 +174,7 @@ const viewer = await PptxViewer.open(buffer, container, {
 | `scrollContainer`  | `HTMLElement`              | --          | Scroll container for IntersectionObserver root                                                                    |
 | `zipLimits`        | `ZipParseLimits`           | --          | Security limits for ZIP parsing (used by `.open()`). Use `RECOMMENDED_ZIP_LIMITS` for untrusted input.            |
 | `lazyMedia`        | `boolean`                  | `false`     | Decode embedded media on demand instead of during ZIP parsing. Best for large decks with windowed list rendering. |
+| `lazySlides`       | `boolean`                  | `false`     | Parse slide shape/table/chart nodes on demand. Best for large decks with windowed list rendering.                 |
 | `pdfjs`            | `PdfjsConfig`              | --          | Optional PDF.js URLs for EMF-embedded PDF fallback rendering, or `false` to disable it.                           |
 | `onSlideChange`    | `(index) => void`          | --          | Shorthand for `slidechange` event                                                                                 |
 | `onSlideRendered`  | `(index, element) => void` | --          | Shorthand for `sliderendered` event                                                                               |
@@ -375,8 +377,9 @@ const renderer = new PptxRenderer(container, { mode: 'list', listMountStrategy: 
 await renderer.preview(buffer); // deprecated — use PptxViewer.open() instead
 ```
 
-`PptxRenderer` accepts the same optional `pdfjs` configuration as `PptxViewer`, so legacy
-users can enable or disable EMF-PDF fallback rendering without changing APIs.
+`PptxRenderer` accepts the same optional `lazyMedia`, `lazySlides`, and `pdfjs`
+configuration as `PptxViewer`, so legacy users can enable performance options or
+EMF-PDF fallback rendering without changing APIs.
 
 ### Utility Exports
 
@@ -385,6 +388,7 @@ import {
   parseZip,
   parseZipLazyMedia,
   buildPresentation,
+  materializeAllSlideNodes,
   serializePresentation,
   buildTextIndex,
   searchText,
@@ -395,6 +399,8 @@ import {
 const files = await parseZip(arrayBuffer, RECOMMENDED_ZIP_LIMITS); // PptxFiles
 const lazyFiles = await parseZipLazyMedia(arrayBuffer, RECOMMENDED_ZIP_LIMITS); // media resolves on demand
 const presentation = buildPresentation(files); // PresentationData
+const lazyPresentation = buildPresentation(lazyFiles, { lazySlides: true }); // slide nodes parse on demand
+materializeAllSlideNodes(lazyPresentation); // optional: force full model materialization
 const json = serializePresentation(presentation); // SerializedPresentation (JSON-safe)
 const index = buildTextIndex(presentation); // TextIndexEntry[]
 const matches = searchText(index, '算力'); // TextSearchResult[]
@@ -430,6 +436,7 @@ All model types are exported for consumers building custom tooling:
 ```ts
 import type {
   PresentationData,
+  BuildPresentationOptions,
   SlideData,
   SlideNode,
   ThemeData,
@@ -528,6 +535,7 @@ ArrayBuffer (.pptx)
 Key design decisions:
 
 - **SafeXmlNode**: Null-safe XML traversal — returns empty nodes instead of null, enabling deep chaining without null checks.
+- **Lazy slide parsing**: Optional `lazySlides` mode keeps per-slide nodes deferred until render, search, serialization, or explicit materialization.
 - **Lazy group parsing**: Group children stored as raw XML, parsed during rendering to avoid deep recursion in model layer.
 - **Error isolation**: Per-node try/catch. A failed shape renders as a dashed-red placeholder; the slide continues.
 - **No external CSS**: All styles inline. The library outputs self-contained HTML fragments.
@@ -535,11 +543,12 @@ Key design decisions:
 
 ## Performance
 
-For large decks (50+ slides), use windowed mounting:
+For large decks (50+ slides), use windowed mounting and opt-in lazy parsing:
 
 ```ts
 const viewer = await PptxViewer.open(buffer, container, {
   zipLimits: RECOMMENDED_ZIP_LIMITS,
+  lazySlides: true,
   lazyMedia: true,
   listOptions: {
     windowed: true,
@@ -604,7 +613,8 @@ No. Rendering depends on browser DOM APIs.
 OOXML is a vast spec. Please open a compatibility issue with a minimal PPTX sample — the visual regression pipeline makes it straightforward to add coverage for new cases.
 
 **How do I render 100+ slide decks efficiently?**
-Use `windowed: true` in `listOptions` — it only mounts slides near the viewport.
+Use `windowed: true` in `listOptions`, and enable `lazySlides: true`. For media-heavy
+decks, also enable `lazyMedia: true`.
 
 ## License
 

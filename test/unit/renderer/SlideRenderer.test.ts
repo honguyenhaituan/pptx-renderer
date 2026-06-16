@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderSlide } from '../../../src/renderer/SlideRenderer';
 import { parseXml, SafeXmlNode } from '../../../src/parser/XmlParser';
-import type { PresentationData } from '../../../src/model/Presentation';
+import { buildPresentation, type PresentationData } from '../../../src/model/Presentation';
 import type { SlideData } from '../../../src/model/Slide';
 import type { ShapeNodeData } from '../../../src/model/nodes/ShapeNode';
+import type { PptxFiles } from '../../../src/parser/ZipParser';
 
 const emptyXml = new SafeXmlNode(null);
 
@@ -95,6 +96,78 @@ function makeTextShape(id: string, name: string, text: string): ShapeNodeData {
   };
 }
 
+function makeLazySlideFiles(): PptxFiles {
+  return {
+    presentation: `
+      <Presentation xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+        <sldSz cx="9144000" cy="5143500"/>
+        <sldIdLst><sldId id="256" r:id="rId1"/></sldIdLst>
+      </Presentation>
+    `,
+    presentationRels: `
+      <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+        <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/>
+      </Relationships>
+    `,
+    slides: new Map([
+      [
+        'ppt/slides/slide1.xml',
+        `
+          <sld xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+            <cSld>
+              <spTree>
+                <sp>
+                  <nvSpPr><cNvPr id="2" name="Deferred label"/><nvPr/></nvSpPr>
+                  <spPr>
+                    <xfrm><off x="914400" y="914400"/><ext cx="1828800" cy="914400"/></xfrm>
+                    <prstGeom prst="rect"><avLst/></prstGeom>
+                  </spPr>
+                  <txBody>
+                    <bodyPr/>
+                    <lstStyle/>
+                    <p><r><t>Deferred label</t></r></p>
+                  </txBody>
+                </sp>
+              </spTree>
+            </cSld>
+          </sld>
+        `,
+      ],
+    ]),
+    slideRels: new Map([
+      [
+        'ppt/slides/_rels/slide1.xml.rels',
+        `
+          <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+            <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>
+          </Relationships>
+        `,
+      ],
+    ]),
+    slideLayouts: new Map([
+      ['ppt/slideLayouts/slideLayout1.xml', '<sldLayout><cSld><spTree/></cSld></sldLayout>'],
+    ]),
+    slideLayoutRels: new Map([
+      [
+        'ppt/slideLayouts/_rels/slideLayout1.xml.rels',
+        `
+          <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+            <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="../slideMasters/slideMaster1.xml"/>
+          </Relationships>
+        `,
+      ],
+    ]),
+    slideMasters: new Map([
+      ['ppt/slideMasters/slideMaster1.xml', '<sldMaster><cSld><spTree/></cSld></sldMaster>'],
+    ]),
+    slideMasterRels: new Map(),
+    themes: new Map(),
+    media: new Map(),
+    charts: new Map(),
+    diagramDrawings: new Map(),
+  };
+}
+
 describe('renderSlide', () => {
   it('creates container with correct dimensions', () => {
     const pres = makeMinimalPres();
@@ -127,6 +200,18 @@ describe('renderSlide', () => {
 
     expect(handle.ready).toBeInstanceOf(Promise);
     await expect(handle.ready).resolves.toBeUndefined();
+  });
+
+  it('materializes lazy slide nodes before rendering slide content', () => {
+    const pres = buildPresentation(makeLazySlideFiles(), { lazySlides: true });
+    const slide = pres.slides[0];
+
+    expect(slide.nodes).toHaveLength(0);
+
+    const handle = renderSlide(pres, slide);
+
+    expect(slide.nodes).toHaveLength(1);
+    expect(handle.element.textContent).toContain('Deferred label');
   });
 
   it('renders shape nodes', () => {

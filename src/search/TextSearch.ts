@@ -1,4 +1,8 @@
-import { resolveNodePlaceholderInheritance, type PresentationData } from '../model/Presentation';
+import {
+  materializeSlideNodes,
+  resolveNodePlaceholderInheritance,
+  type PresentationData,
+} from '../model/Presentation';
 import type { SlideNode } from '../model/Slide';
 import type { BaseNodeData, NodeType, Position, Size } from '../model/nodes/BaseNode';
 import type { GroupNodeData } from '../model/nodes/GroupNode';
@@ -323,6 +327,8 @@ export const buildTextIndex = (
   const entries: TextIndexEntry[] = [];
 
   presentation.slides.forEach((slide, slideIndex) => {
+    materializeSlideNodes(presentation, slide);
+
     const layoutPath = presentation.slideToLayout.get(slide.index) || slide.layoutIndex;
     const layout = presentation.layouts.get(layoutPath);
     const masterPath = layoutPath ? presentation.layoutToMaster.get(layoutPath) : '';

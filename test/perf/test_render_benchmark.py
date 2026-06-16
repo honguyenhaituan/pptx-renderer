@@ -44,7 +44,7 @@ def test_build_markdown_report_groups_results_by_case_and_strategy() -> None:
     assert "# PPTX Renderer Performance Benchmark" in markdown
     assert "`http://127.0.0.1:5173`" in markdown
     assert (
-        "| tiny | full | no | 2 | 12 | 1.0 KiB | 1.2 | 2.3 | 3.4 | 12.3 | 40.5 | 5.6 | "
+        "| tiny | full | no | no | 2 | 12 | 1.0 KiB | 1.2 | 2.3 | 3.4 | 12.3 | 40.5 | 5.6 | "
         "4.0 KiB | 2.0 KiB | 3/3 | 300 | 2 |"
     ) in markdown
 
@@ -57,6 +57,7 @@ def test_results_to_json_payload_is_stable_and_records_source_paths(tmp_path: Pa
             case_name="tiny",
             strategy="windowed",
             lazy_media=True,
+            lazy_slides=True,
             bytes=4,
             slides=1,
             nodes=3,
@@ -89,6 +90,7 @@ def test_results_to_json_payload_is_stable_and_records_source_paths(tmp_path: Pa
     assert payload["results"][0]["caseName"] == "tiny"
     assert payload["results"][0]["sourcePath"] == str(source)
     assert payload["results"][0]["lazyMedia"] is True
+    assert payload["results"][0]["lazySlides"] is True
     assert payload["results"][0]["firstSlideMs"] == 0.35
     assert payload["results"][0]["heapUsedBytes"] == 1234
     assert payload["results"][0]["mediaBytes"] == 4321

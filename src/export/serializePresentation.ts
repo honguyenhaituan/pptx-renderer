@@ -3,7 +3,11 @@
  * Strips all SafeXmlNode references and re-parses group children.
  */
 
-import { PresentationData, resolveNodePlaceholderInheritance } from '../model/Presentation';
+import {
+  materializeSlideNodes,
+  PresentationData,
+  resolveNodePlaceholderInheritance,
+} from '../model/Presentation';
 import { SlideNode } from '../model/Slide';
 import { ShapeNodeData, TextBody } from '../model/nodes/ShapeNode';
 import { PicNodeData } from '../model/nodes/PicNode';
@@ -204,6 +208,8 @@ export function serializePresentation(pres: PresentationData): SerializedPresent
     height: pres.height,
     slideCount: pres.slides.length,
     slides: pres.slides.map((slide, i) => {
+      materializeSlideNodes(pres, slide);
+
       const layoutPath = pres.slideToLayout.get(slide.index) || slide.layoutIndex;
       const layout = pres.layouts.get(layoutPath);
       const masterPath = layoutPath ? pres.layoutToMaster.get(layoutPath) : '';

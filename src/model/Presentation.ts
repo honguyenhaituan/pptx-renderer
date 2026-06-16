@@ -11,7 +11,7 @@ import { emuToPx } from '../parser/units';
 import { ThemeData, parseTheme } from './Theme';
 import { MasterData, parseMaster } from './Master';
 import { LayoutData, parseLayout, PlaceholderEntry } from './Layout';
-import { SlideData, SlideNode, parseSlide } from './Slide';
+import { SlideData, SlideNode, createLazySlide, materializeSlideData, parseSlide } from './Slide';
 import { BaseNodeData, PlaceholderInfo, Position, Size } from './nodes/BaseNode';
 import type { GroupNodeData } from './nodes/GroupNode';
 
@@ -40,6 +40,14 @@ export interface PresentationData {
   /** Chart color style parts keyed by chart part path. */
   chartColorStyles?: Map<string, SafeXmlNode>;
   isWps: boolean;
+}
+
+export interface BuildPresentationOptions {
+  /**
+   * Defer per-slide shape/table/chart node parsing until a slide is rendered,
+   * searched, serialized, or explicitly materialized.
+   */
+  lazySlides?: boolean;
 }
 
 /**
@@ -122,7 +130,10 @@ function findRelsByType(rels: Map<string, RelEntry>, typeSubstring: string): [st
  * 2. Resolves the full relationship chain: slide → layout → master → theme
  * 3. Parses each component and assembles the final structure
  */
-export function buildPresentation(files: PptxFiles): PresentationData {
+export function buildPresentation(
+  files: PptxFiles,
+  options: BuildPresentationOptions = {},
+): PresentationData {
   // --- Parse presentation root ---
   const presRoot = parseXml(files.presentation);
   const presRels = parseRels(files.presentationRels);
@@ -294,9 +305,9 @@ export function buildPresentation(files: PptxFiles): PresentationData {
     const slideRelsXml = files.slideRels.get(slideRelsPath);
     const slideRels = slideRelsXml ? parseRels(slideRelsXml) : new Map<string, RelEntry>();
 
-    // Parse slide
-    const slideRoot = parseXml(slideXml);
-    const slideData = parseSlide(slideRoot, i, slideRels, slidePath, files.diagramDrawings);
+    const slideData = options.lazySlides
+      ? createLazySlide(slideXml, i, slideRels, slidePath)
+      : parseSlide(parseXml(slideXml), i, slideRels, slidePath, files.diagramDrawings);
 
     // Resolve layout path from the slide's layout relationship target
     if (slideData.layoutIndex) {
@@ -340,7 +351,9 @@ export function buildPresentation(files: PptxFiles): PresentationData {
   };
 
   // --- Resolve placeholder position inheritance ---
-  resolvePlaceholderInheritance(result);
+  if (!options.lazySlides) {
+    resolvePlaceholderInheritance(result);
+  }
 
   return result;
 }
@@ -434,13 +447,30 @@ function getMasterPlaceholderEntries(master: MasterData): PlaceholderEntry[] {
  */
 function resolvePlaceholderInheritance(pres: PresentationData): void {
   for (let i = 0; i < pres.slides.length; i++) {
-    const slide = pres.slides[i];
-    const layoutPath = pres.slideToLayout.get(i);
-    const layout = layoutPath ? pres.layouts.get(layoutPath) : undefined;
-    const masterPath = layoutPath ? pres.layoutToMaster.get(layoutPath) : undefined;
-    const master = masterPath ? pres.masters.get(masterPath) : undefined;
+    resolveSlidePlaceholderInheritance(pres, pres.slides[i]);
+  }
+}
 
-    resolveNodesPlaceholders(slide.nodes, layout, master);
+function resolveSlidePlaceholderInheritance(pres: PresentationData, slide: SlideData): void {
+  if (slide.placeholderInheritanceResolved) return;
+
+  const layoutPath = pres.slideToLayout.get(slide.index) || slide.layoutIndex;
+  const layout = layoutPath ? pres.layouts.get(layoutPath) : undefined;
+  const masterPath = layoutPath ? pres.layoutToMaster.get(layoutPath) : undefined;
+  const master = masterPath ? pres.masters.get(masterPath) : undefined;
+
+  resolveNodesPlaceholders(slide.nodes, layout, master);
+  slide.placeholderInheritanceResolved = true;
+}
+
+export function materializeSlideNodes(pres: PresentationData, slide: SlideData): void {
+  materializeSlideData(slide, pres.diagramDrawings);
+  resolveSlidePlaceholderInheritance(pres, slide);
+}
+
+export function materializeAllSlideNodes(pres: PresentationData): void {
+  for (const slide of pres.slides) {
+    materializeSlideNodes(pres, slide);
   }
 }
 

@@ -3,7 +3,7 @@
  */
 
 import { SlideData } from '../model/Slide';
-import { PresentationData } from '../model/Presentation';
+import { materializeSlideNodes, PresentationData } from '../model/Presentation';
 import { RenderContext, createRenderContext } from './RenderContext';
 import { renderBackground } from './BackgroundRenderer';
 import { renderShape } from './ShapeRenderer';
@@ -250,6 +250,8 @@ export function renderSlide(
   slide: SlideData,
   options?: SlideRendererOptions,
 ): SlideHandle {
+  materializeSlideNodes(presentation, slide);
+
   const isSharedCache = !!options?.mediaUrlCache;
   const chartInstances = options?.chartInstances ?? new Set<ECharts>();
   const asyncTasks: Promise<void>[] = [];

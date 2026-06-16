@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { buildPresentation } from '../../../src/model/Presentation';
+import {
+  buildPresentation,
+  materializeAllSlideNodes,
+  materializeSlideNodes,
+} from '../../../src/model/Presentation';
 import type { PptxFiles } from '../../../src/parser/ZipParser';
+import { serializePresentation } from '../../../src/export/serializePresentation';
+import { buildTextIndex } from '../../../src/search/TextSearch';
 
 /**
  * Create a minimal PptxFiles structure with one slide, layout, master, and theme.
@@ -31,6 +37,11 @@ function makeMinimalFiles(overrides: Partial<PptxFiles> = {}): PptxFiles {
               <xfrm><off x="914400" y="914400"/><ext cx="7315200" cy="1143000"/></xfrm>
               <prstGeom prst="rect"><avLst/></prstGeom>
             </spPr>
+            <txBody>
+              <bodyPr/>
+              <lstStyle/>
+              <p><r><t>Deferred title</t></r></p>
+            </txBody>
           </sp>
         </spTree>
       </cSld>
@@ -148,6 +159,37 @@ describe('buildPresentation', () => {
     expect(pres.slides).toHaveLength(1);
     expect(pres.slides[0].nodes).toHaveLength(1);
     expect(pres.slides[0].nodes[0].nodeType).toBe('shape');
+  });
+
+  it('can defer slide node parsing until the slide is materialized', () => {
+    const pres = buildPresentation(makeMinimalFiles(), { lazySlides: true });
+
+    expect(pres.slides).toHaveLength(1);
+    expect(pres.slides[0].nodes).toHaveLength(0);
+
+    materializeSlideNodes(pres, pres.slides[0]);
+
+    expect(pres.slides[0].nodes).toHaveLength(1);
+    expect(pres.slides[0].nodes[0].nodeType).toBe('shape');
+  });
+
+  it('materializes lazy slides for search and serialization consumers', () => {
+    const pres = buildPresentation(makeMinimalFiles(), { lazySlides: true });
+
+    const index = buildTextIndex(pres);
+    const serialized = serializePresentation(pres);
+
+    expect(index.map((entry) => entry.text)).toContain('Deferred title');
+    expect(serialized.slides[0].nodes[0].textBody?.totalText).toBe('Deferred title');
+    expect(pres.slides[0].nodes).toHaveLength(1);
+  });
+
+  it('can materialize all lazy slides explicitly', () => {
+    const pres = buildPresentation(makeMinimalFiles(), { lazySlides: true });
+
+    materializeAllSlideNodes(pres);
+
+    expect(pres.slides[0].nodes).toHaveLength(1);
   });
 
   it('preserves diagram fallback drawings for render/export/search contexts', () => {
@@ -277,12 +319,7 @@ describe('buildPresentation', () => {
 
   it('marks slides with show="0" as hidden without dropping them', () => {
     const files = makeMinimalFiles({
-      slides: new Map([
-        [
-          'ppt/slides/slide1.xml',
-          '<sld show="0"><cSld><spTree/></cSld></sld>',
-        ],
-      ]),
+      slides: new Map([['ppt/slides/slide1.xml', '<sld show="0"><cSld><spTree/></cSld></sld>']]),
     });
 
     const pres = buildPresentation(files);

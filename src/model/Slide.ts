@@ -3,7 +3,7 @@
  * with typed node objects for each shape on the slide.
  */
 
-import { SafeXmlNode } from '../parser/XmlParser';
+import { parseXml, SafeXmlNode } from '../parser/XmlParser';
 import { RelEntry } from '../parser/RelParser';
 import { parseRenderableChild, type RenderableNode } from './RenderableChild';
 import { parseOoxmlBool } from '../parser/booleans';
@@ -24,6 +24,12 @@ export interface SlideData {
   slidePath: string;
   /** When false, shapes from the layout and master should NOT be rendered on this slide. */
   showMasterSp: boolean;
+  /** @internal Raw slide XML used when slide node parsing is deferred. */
+  sourceXml?: string;
+  /** @internal Whether `nodes` has been parsed from `sourceXml`. */
+  nodesMaterialized?: boolean;
+  /** @internal Whether layout/master placeholder inheritance has been applied. */
+  placeholderInheritanceResolved?: boolean;
 }
 
 function parseDefaultTrueBoolAttr(value: string | undefined): boolean {
@@ -95,5 +101,52 @@ export function parseSlide(
     rels,
     slidePath,
     showMasterSp,
+    nodesMaterialized: true,
   };
+}
+
+export function createLazySlide(
+  sourceXml: string,
+  index: number,
+  rels: Map<string, RelEntry>,
+  slidePath: string = '',
+): SlideData {
+  return {
+    index,
+    nodes: [],
+    layoutIndex: findLayoutRel(rels),
+    rels,
+    slidePath,
+    showMasterSp: true,
+    sourceXml,
+    nodesMaterialized: false,
+  };
+}
+
+export function materializeSlideData(
+  slide: SlideData,
+  diagramDrawings?: Map<string, string>,
+): void {
+  if (slide.nodesMaterialized) return;
+  if (!slide.sourceXml) {
+    slide.nodesMaterialized = true;
+    return;
+  }
+
+  const resolvedLayoutIndex = slide.layoutIndex;
+  const parsed = parseSlide(
+    parseXml(slide.sourceXml),
+    slide.index,
+    slide.rels,
+    slide.slidePath,
+    diagramDrawings,
+  );
+
+  slide.hidden = parsed.hidden;
+  slide.nodes = parsed.nodes;
+  slide.background = parsed.background;
+  slide.layoutIndex = resolvedLayoutIndex || parsed.layoutIndex;
+  slide.showMasterSp = parsed.showMasterSp;
+  slide.nodesMaterialized = true;
+  slide.sourceXml = undefined;
 }

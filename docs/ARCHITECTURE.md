@@ -34,6 +34,8 @@ Responsibilities:
 - Build normalized in-memory presentation model.
 - Resolve layout/master/theme inheritance.
 - Parse node-level geometry, text, style, and relationship references.
+- Optionally defer per-slide node parsing with `lazySlides` until render, search, or
+  serialization consumes that slide.
 - Build model-level text indexes and search results that are independent of mounted DOM.
 
 ## 3) Render Layer
@@ -67,6 +69,10 @@ Responsibilities:
 - Windowed (`windowed: true`): mount near-viewport slides via `IntersectionObserver`, with fallback to full mode when unavailable.
 
 This keeps default behavior backward compatible while enabling lower memory pressure for large decks.
+For large viewer surfaces, `windowed: true` pairs with `lazySlides: true` so off-screen
+slides do not pay shape/table/chart parsing cost before the first visible slides render.
+For media-heavy decks, `lazyMedia: true` also keeps package media compressed until a
+rendered slide references it.
 
 ## Search, Highlights, and Scaled Previews
 

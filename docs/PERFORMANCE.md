@@ -1,6 +1,8 @@
 # Performance Guide
 
-This document describes practical tuning options for `@aiden0z/pptx-renderer` without changing render output semantics.
+This document describes practical tuning options for `@aiden0z/pptx-renderer` without
+changing rendered output semantics. Defaults stay eager for backward compatibility; the
+large-deck optimizations below are opt-in.
 
 ## List Render Options
 
@@ -84,6 +86,53 @@ time to visible-slide render time, so small decks and full-DOM rendering may not
 lower wall-clock render time. The best fit is `lazyMedia: true` plus `windowed: true`
 for large, media-heavy decks.
 
+## Lazy Slide Node Parsing
+
+Large decks can also spend significant time building every slide's shape, table, chart,
+picture, and group nodes before the first visible slide is rendered. Enable `lazySlides`
+to keep those per-slide nodes deferred until a slide is rendered, searched, serialized,
+or explicitly materialized by a model consumer.
+
+```ts
+await PptxViewer.open(buffer, container, {
+  zipLimits: RECOMMENDED_ZIP_LIMITS,
+  lazySlides: true,
+  listOptions: {
+    windowed: true,
+    initialSlides: 4,
+    batchSize: 4,
+  },
+});
+```
+
+If you use the manual pipeline, pass the same option to `buildPresentation()`:
+
+```ts
+import { buildPresentation, parseZip, RECOMMENDED_ZIP_LIMITS } from '@aiden0z/pptx-renderer';
+
+const files = await parseZip(buffer, RECOMMENDED_ZIP_LIMITS);
+const presentation = buildPresentation(files, { lazySlides: true });
+```
+
+Use this when first-render latency is the bottleneck and your UI mounts only a subset of
+slides initially. In the current local benchmark, `lazySlides` reduced model build time
+by about 52-66% on medium and large decks, and reduced parse + build + render time for
+the first window by about 16-22%. Materialized slide nodes in the initial window dropped
+from hundreds or thousands of nodes to only the visible-window nodes.
+
+This is primarily a startup and first-window optimization. Full-DOM rendering still has
+to parse every slide before it can finish, so `lazySlides` may only move work from model
+build time into render time for full-render/export-style workflows. For those workflows,
+prefer the default eager model unless first visible content is more important than total
+completion time. Combining `lazySlides` with `lazyMedia` can lower media memory by more
+than 95% on media-heavy decks, but it also moves media decoding into visible-slide render
+time, so total wall-clock time depends on deck shape and browser cache state.
+
+`serializePresentation()`, `buildTextIndex()`, `searchPresentation()`, and viewer search
+materialize deferred slide nodes before reading them, so search/export behavior remains
+compatible with eager presentations. Manual consumers can call `materializeSlideNodes()`
+for one slide or `materializeAllSlideNodes()` for the full model.
+
 ## Built-In Resource Guards
 
 These guards are applied by the renderer even when ZIP byte limits are configured, because some PPTX structures can be small on disk but expensive after parsing:
@@ -108,6 +157,7 @@ await PptxViewer.open(buffer, container, {
 ```ts
 await PptxViewer.open(buffer, container, {
   zipLimits: RECOMMENDED_ZIP_LIMITS,
+  lazySlides: true,
   listOptions: {
     windowed: true,
     batchSize: 8,
@@ -122,6 +172,7 @@ await PptxViewer.open(buffer, container, {
 ```ts
 await PptxViewer.open(buffer, container, {
   zipLimits: RECOMMENDED_ZIP_LIMITS,
+  lazySlides: true,
   lazyMedia: true,
   listOptions: {
     windowed: true,
@@ -136,6 +187,8 @@ await PptxViewer.open(buffer, container, {
 
 - Omit `windowed` (or set to `false`) when you need all slides in DOM at once (some compare/export pipelines).
 - Use `windowed: true` when memory pressure and long first-render latency are the bottleneck.
+- Use `lazySlides: true` with windowed rendering when model build time is delaying first paint.
+- Use `lazyMedia: true` with windowed rendering when decompressed media memory is the bottleneck.
 - If `IntersectionObserver` is unavailable, windowed mode automatically falls back to full mounting.
 - A newer render request supersedes older queued or batched work. This keeps rapid calls such as `setZoom()`, `setFitMode()`, `renderList()`, and `renderSlide()` from continuing stale list batches after the next request has been queued.
 
@@ -184,4 +237,5 @@ Examples:
 
 - Compare both first contentful render and interaction smoothness.
 - Measure memory (DOM node count + browser heap) on long decks.
+- Use `test/perf/render_benchmark.py --lazy-slides --lazy-media` to measure the combined large-deck path.
 - Validate visual parity with existing unit/e2e tests after tuning.
