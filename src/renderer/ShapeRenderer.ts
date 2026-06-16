@@ -1993,6 +1993,8 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
         const anchor = ownAnchor || fallbackAnchor;
         const hasExplicitTextAnchor = ownAnchor !== undefined || fallbackAnchor !== undefined;
         textAnchor = anchor;
+        const vert =
+          (bodyPr ? bodyPr.attr('vert') : null) || (fallbackBp ? fallbackBp.attr('vert') : null);
         if (anchor === 't') {
           textContainer.style.justifyContent = 'flex-start';
         } else if (anchor === 'ctr') {
@@ -2022,15 +2024,22 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
         const topPad = tIns !== undefined ? emuToPx(tIns) : emuToPx(45720);
         const rightPad = rIns !== undefined ? emuToPx(rIns) : emuToPx(91440);
         const bottomPad = bIns !== undefined ? emuToPx(bIns) : emuToPx(45720);
+        const textBoxHeight = node.textBoxBounds?.h ?? node.size.h;
+        const collapseVerticalInsets =
+          usesImplicitSingleLineFit &&
+          !vert &&
+          anchor === 'ctr' &&
+          textBoxHeight > 0 &&
+          topPad + bottomPad >= textBoxHeight;
+        const effectiveTopPad = collapseVerticalInsets ? 0 : topPad;
+        const effectiveBottomPad = collapseVerticalInsets ? 0 : bottomPad;
 
         textContainer.style.paddingLeft = `${leftPad}px`;
-        textContainer.style.paddingTop = `${topPad}px`;
+        textContainer.style.paddingTop = `${effectiveTopPad}px`;
         textContainer.style.paddingRight = `${rightPad}px`;
-        textContainer.style.paddingBottom = `${bottomPad}px`;
+        textContainer.style.paddingBottom = `${effectiveBottomPad}px`;
 
         // Vertical text support (bodyPr@vert)
-        const vert =
-          (bodyPr ? bodyPr.attr('vert') : null) || (fallbackBp ? fallbackBp.attr('vert') : null);
         if (vert === 'eaVert') {
           applyVerticalTextFlow(textContainer, textAnchor);
           isVerticalText = true;
@@ -2175,6 +2184,11 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
             wrappedHeightFits &&
             wrappedContentH > containerH &&
             containerH > 0;
+          const hasIgnoredImplicitSingleLineVerticalOverflow =
+            usesImplicitSingleLineFit &&
+            wrappedWidthFits &&
+            wrappedContentH > containerH &&
+            containerH > 0;
           const shouldMeasureUnwrappedWidth =
             !isVerticalText &&
             !spAutoFitAllowsHorizontalOverflow &&
@@ -2198,7 +2212,7 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
             wrapper.style.visibility = savedWrapperVisibility;
           }
           let scale = 1;
-          const fitWidthOnly = usesNoAutofitSingleLineTitleFit;
+          const fitWidthOnly = usesNoAutofitSingleLineTitleFit || usesImplicitSingleLineFit;
           const usesUnwrappedNoScaleFit =
             hasSpAutoFit &&
             !hasNormAutofit &&
@@ -2236,7 +2250,8 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
               usesNoAutofitSingleLineTitleFit;
             if (
               canUseUnwrappedWidthScale &&
-              (!fitWidthOnly || widthScale >= NO_AUTOFIT_TITLE_METRIC_SCALE_FLOOR)
+              (!usesNoAutofitSingleLineTitleFit ||
+                widthScale >= NO_AUTOFIT_TITLE_METRIC_SCALE_FLOOR)
             ) {
               scale = Math.min(scale, widthScale);
             }
@@ -2247,6 +2262,9 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
             scale < 1 &&
             contentH <= containerH &&
             !wrappedHeightFits;
+          if (usesUnwrappedWidthFit) {
+            textContainer.style.whiteSpace = 'nowrap';
+          }
           if (
             !fitWidthOnly &&
             !usesUnwrappedNoScaleFit &&
@@ -2277,7 +2295,10 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
             appendTransform(textContainer, `scale(${scale})`);
             textContainer.style.width = expandCssLengthForScale(baseWidth, scale);
             textContainer.style.height = expandCssLengthForScale(baseHeight, scale);
-          } else if (hasToleratedVerticalMetricOverhang) {
+          } else if (
+            hasToleratedVerticalMetricOverhang ||
+            hasIgnoredImplicitSingleLineVerticalOverflow
+          ) {
             textContainer.style.overflowY = 'visible';
           }
         };

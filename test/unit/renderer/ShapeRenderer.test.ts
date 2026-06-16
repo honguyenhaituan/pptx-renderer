@@ -829,6 +829,80 @@ describe('ShapeRenderer', () => {
     }
   });
 
+  it('keeps scaled single-line spAutoFit text nowrap after measuring unwrapped width (ai-computing slide 20)', () => {
+    const isFitContainer = (el: HTMLElement) =>
+      el.style.display === 'flex' && el.style.flexDirection === 'column';
+    const clientWidthSpy = vi
+      .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 247 : 0;
+      });
+    const clientHeightSpy = vi
+      .spyOn(HTMLElement.prototype, 'clientHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 33 : 0;
+      });
+    const scrollWidthSpy = vi
+      .spyOn(HTMLElement.prototype, 'scrollWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        if (!isFitContainer(this)) return 0;
+        return this.style.whiteSpace === 'nowrap' ? 249 : 247;
+      });
+    const scrollHeightSpy = vi
+      .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        if (!isFitContainer(this)) return 0;
+        return this.style.whiteSpace === 'nowrap' ? 33 : 47;
+      });
+
+    try {
+      const xml = `
+        <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+              xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <p:nvSpPr>
+            <p:cNvPr id="102" name="文本框 71"/>
+            <p:cNvSpPr txBox="1"/>
+            <p:nvPr/>
+          </p:nvSpPr>
+          <p:spPr>
+            <a:xfrm><a:off x="9491028" y="3989916"/><a:ext cx="2337031" cy="307777"/></a:xfrm>
+            <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+            <a:noFill/>
+          </p:spPr>
+          <p:txBody>
+            <a:bodyPr wrap="square" rtlCol="0"><a:spAutoFit/></a:bodyPr>
+            <a:lstStyle/>
+            <a:p>
+              <a:pPr marL="0" marR="0" lvl="0" indent="0"/>
+              <a:r><a:rPr sz="1400" b="1"/><a:t>Max-Min Fairness</a:t></a:r>
+              <a:r><a:rPr sz="1400" b="1"/><a:t>优先级：</a:t></a:r>
+            </a:p>
+          </p:txBody>
+        </p:sp>
+      `;
+
+      const el = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+      const textContainer = Array.from(el.querySelectorAll('div')).find(
+        (div) =>
+          div.textContent?.includes('Max-Min Fairness优先级') &&
+          div.style.flexDirection === 'column',
+      ) as HTMLElement | undefined;
+      const scaleMatch = textContainer?.style.transform.match(/scale\(([^)]+)\)/);
+      const scale = Number(scaleMatch?.[1]);
+
+      expect(textContainer).toBeDefined();
+      expect(scale).toBeGreaterThan(0.98);
+      expect(scale).toBeLessThan(1);
+      expect(textContainer!.style.whiteSpace).toBe('nowrap');
+      expect(textContainer!.style.overflowY).toBe('hidden');
+    } finally {
+      clientWidthSpy.mockRestore();
+      clientHeightSpy.mockRestore();
+      scrollWidthSpy.mockRestore();
+      scrollHeightSpy.mockRestore();
+    }
+  });
+
   it('top-aligns wrapping spAutoFit text boxes without an explicit anchor (oracle-pypptx-text-0007-font-impact)', () => {
     const xml = `
       <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
@@ -928,6 +1002,8 @@ describe('ShapeRenderer', () => {
       expect(textContainer).toBeDefined();
       expect(textContainer!.style.transform).not.toContain('scale(');
       expect(textContainer!.style.overflowY).toBe('visible');
+      expect(textContainer!.style.paddingTop).toBe('0px');
+      expect(textContainer!.style.paddingBottom).toBe('0px');
     } finally {
       clientWidthSpy.mockRestore();
       clientHeightSpy.mockRestore();
@@ -996,6 +1072,75 @@ describe('ShapeRenderer', () => {
       expect(textContainer!.style.transform).toContain('scale(');
       const scale = Number(textContainer!.style.transform.match(/scale\(([^)]+)\)/)?.[1]);
       expect(scale).toBeLessThan(1);
+    } finally {
+      clientWidthSpy.mockRestore();
+      clientHeightSpy.mockRestore();
+      scrollWidthSpy.mockRestore();
+      scrollHeightSpy.mockRestore();
+    }
+  });
+
+  it('does not shrink implicit single-line labels solely because insets exceed height (ai-computing slide 29)', () => {
+    const isFitContainer = (el: HTMLElement) =>
+      el.style.display === 'flex' && el.style.flexDirection === 'column';
+    const clientWidthSpy = vi
+      .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 93 : 0;
+      });
+    const clientHeightSpy = vi
+      .spyOn(HTMLElement.prototype, 'clientHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 21 : 0;
+      });
+    const scrollWidthSpy = vi
+      .spyOn(HTMLElement.prototype, 'scrollWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        if (!isFitContainer(this)) return 0;
+        return this.style.whiteSpace === 'nowrap' ? 64 : 93;
+      });
+    const scrollHeightSpy = vi
+      .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return isFitContainer(this) ? 28 : 0;
+      });
+
+    try {
+      const xml = `
+        <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+              xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <p:nvSpPr>
+            <p:cNvPr id="2182" name="矩形 332"/>
+            <p:cNvSpPr/>
+            <p:nvPr/>
+          </p:nvSpPr>
+          <p:spPr>
+            <a:xfrm><a:off x="10483789" y="3508625"/><a:ext cx="888470" cy="204637"/></a:xfrm>
+            <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+            <a:noFill/>
+          </p:spPr>
+          <p:txBody>
+            <a:bodyPr lIns="182880" tIns="182880" rIns="182880" bIns="182880"
+                      rtlCol="0" anchor="ctr"/>
+            <a:lstStyle/>
+            <a:p>
+              <a:pPr algn="ctr"><a:defRPr/></a:pPr>
+              <a:r><a:rPr sz="800" b="1"/><a:t>任务监控</a:t></a:r>
+            </a:p>
+          </p:txBody>
+        </p:sp>
+      `;
+
+      const el = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+      const textContainer = Array.from(el.querySelectorAll('div')).find(
+        (div) => div.textContent?.includes('任务监控') && div.style.flexDirection === 'column',
+      ) as HTMLElement | undefined;
+
+      expect(textContainer).toBeDefined();
+      expect(textContainer!.style.transform).not.toContain('scale(');
+      expect(textContainer!.style.overflowY).toBe('visible');
+      expect(textContainer!.style.paddingTop).toBe('0px');
+      expect(textContainer!.style.paddingBottom).toBe('0px');
     } finally {
       clientWidthSpy.mockRestore();
       clientHeightSpy.mockRestore();
