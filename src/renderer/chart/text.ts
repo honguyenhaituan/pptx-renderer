@@ -57,10 +57,7 @@ export function extractTxPrColor(parentNode: SafeXmlNode, ctx: RenderContext): s
   return undefined;
 }
 
-export function extractDefRPrStyle(
-  defRPr: SafeXmlNode,
-  ctx: RenderContext,
-): ChartTextStyle | undefined {
+function extractDefRPrStyle(defRPr: SafeXmlNode, ctx: RenderContext): ChartTextStyle | undefined {
   if (!defRPr.exists()) return undefined;
 
   const style: ChartTextStyle = {};
@@ -95,7 +92,7 @@ export function extractDefRPrStyle(
     : undefined;
 }
 
-export function extractParagraphTextStyle(
+function extractParagraphTextStyle(
   parentNode: SafeXmlNode,
   ctx: RenderContext,
 ): ChartTextStyle | undefined {

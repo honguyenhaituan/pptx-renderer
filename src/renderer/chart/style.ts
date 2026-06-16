@@ -111,10 +111,7 @@ export function extractChartLineStyle(
   };
 }
 
-export function buildEChartsGradient(
-  gradFill: SafeXmlNode,
-  ctx: RenderContext,
-): object | undefined {
+function buildEChartsGradient(gradFill: SafeXmlNode, ctx: RenderContext): object | undefined {
   const gsLst = gradFill.child('gsLst');
   if (!gsLst.exists()) return undefined;
 

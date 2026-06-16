@@ -378,7 +378,7 @@ export function niceAxisMax(dataMax: number, dataMin: number, desiredTicks = 5):
   return niceMax <= dataMax ? niceMax + niceInterval : niceMax;
 }
 
-export function niceAxisMin(dataMax: number, dataMin: number, desiredTicks = 5): number {
+function niceAxisMin(dataMax: number, dataMin: number, desiredTicks = 5): number {
   const niceInterval = niceAxisInterval(dataMax, dataMin, desiredTicks);
   const niceMin = Math.floor(dataMin / niceInterval) * niceInterval;
   return niceMin >= dataMin ? niceMin - niceInterval : niceMin;

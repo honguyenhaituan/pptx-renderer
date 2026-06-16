@@ -491,7 +491,7 @@ function inheritPlaceholderType(target: PlaceholderInfo, sourceNode: SafeXmlNode
   }
 }
 
-export interface PlaceholderInheritanceOptions {
+interface PlaceholderInheritanceOptions {
   /**
    * Parent group for lazy-parsed group children. Layout/master placeholders are
    * stored in slide coordinates, while group children render in the group's

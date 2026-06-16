@@ -11,6 +11,7 @@
 - [Contributing](CONTRIBUTING.md) — PR checklist, code style, test requirements
 - [Security](SECURITY.md) — ZIP parse limits, URL filtering, vulnerability reporting
 - [Releasing](RELEASING.md) — Release checklist and versioning
+- [v1.2.0 Release Notes](releases/v1.2.0.md) — Lazy slide parsing, lazy media decoding, performance notes, and demo updates
 - [v1.1.0 Release Notes](releases/v1.1.0.md) — Search, highlights, scaled previews, and migration notes
 - [v1.0.4 Release Notes](releases/v1.0.4.md) — PDF.js fallback setup and rendering fidelity notes
 

@@ -543,7 +543,12 @@ Key design decisions:
 
 ## Performance
 
-For large decks (50+ slides), use windowed mounting and opt-in lazy parsing:
+The default behavior stays eager for compatibility: parse the package, build the full
+model, and render according to the selected mode. For large or media-heavy decks, opt
+into the lazy/windowed path so the first visible slides can render without materializing
+every slide and every media entry up front.
+
+Use this preset for interactive viewers:
 
 ```ts
 const viewer = await PptxViewer.open(buffer, container, {
@@ -557,6 +562,34 @@ const viewer = await PptxViewer.open(buffer, container, {
     overscanViewport: 1.5,
   },
 });
+```
+
+Recommended choices:
+
+| Scenario                              | Recommended options                                     | Main benefit                                 |
+| ------------------------------------- | ------------------------------------------------------- | -------------------------------------------- |
+| User-uploaded PPTX                    | `zipLimits: RECOMMENDED_ZIP_LIMITS`                     | Bounds ZIP parsing work and decoded payloads |
+| Long scrollable viewer                | `listOptions.windowed: true`                            | Keeps off-screen slides out of the DOM       |
+| Large decks with many slide elements  | `lazySlides: true` plus windowed list rendering         | Defers per-slide node parsing until needed   |
+| Media-heavy decks                     | `lazyMedia: true` plus windowed list rendering          | Defers image/audio/video byte decoding       |
+| Export, print, or full comparison job | Eager defaults, or explicitly materialize before export | Ensures all slides are ready in one pass     |
+
+In local benchmarks, `lazySlides` reduced model build time by roughly 52-66% on medium
+and large decks, and lowered first-window parse + build + render time by roughly 16-22%.
+For media-heavy windowed viewers, `lazyMedia` reduced initially decompressed media bytes
+by about 72-97%, depending on deck content. These options preserve rendering semantics;
+they mainly move work from initial load to the moment a slide or media item is actually
+needed.
+
+Manual pipelines can use the same building blocks:
+
+```ts
+const files = await parseZipLazyMedia(buffer, RECOMMENDED_ZIP_LIMITS);
+const presentation = buildPresentation(files, { lazySlides: true });
+
+const viewer = new PptxViewer(container);
+viewer.load(presentation);
+await viewer.renderList({ windowed: true, initialSlides: 4 });
 ```
 
 Details: [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md)

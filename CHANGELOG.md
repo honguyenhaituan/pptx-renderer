@@ -7,6 +7,43 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-06-16
+
+### Added
+
+- Added lazy media decoding via `parseZipLazyMedia()` and `lazyMedia` options on
+  `PptxViewer` and deprecated `PptxRenderer`.
+- Added lazy slide node parsing via `buildPresentation(files, { lazySlides: true })`,
+  `materializeSlideNodes()`, and `materializeAllSlideNodes()`.
+- Added exported lazy-materialization helpers for search, serialization, and custom
+  model consumers that need explicit control over deferred slide nodes.
+- Added a repeatable performance benchmark tool under `test/perf/render_benchmark.py`
+  for comparing eager, lazy, full-list, and windowed rendering paths.
+- Added public demo coverage for recommended large-deck options.
+
+### Changed
+
+- Public demo rendering now uses recommended ZIP limits, lazy slide parsing, lazy media
+  decoding, and windowed list mounting by default.
+- Public demo empty state now exposes direct upload and sample actions.
+- Public demo no longer exposes the broken list/slide mode toggle; it focuses on the
+  stable scrollable list workflow with search and thumbnails.
+- README now documents when to use windowed rendering, `lazySlides`, `lazyMedia`, and
+  eager rendering for export-style workflows.
+- Performance documentation now covers lazy media, lazy slide parsing, benchmark
+  expectations, and strategy selection for small, medium, and large decks.
+- Chart rendering internals were split into smaller modules while preserving the public
+  API.
+
+### Fixed
+
+- Improved rendering fidelity across OOXML chart defaults, legends, data labels, axes,
+  table styling, text autofit, arrow markers, pattern fills, shadows, and template
+  preview content.
+- Hardened OOXML parsing for relationship targets, namespaced attributes, package media
+  path aliases, and boolean default semantics.
+- Improved serialization and search compatibility with lazily materialized slide nodes.
+
 ## [1.1.0] - 2026-06-05
 
 ### Added

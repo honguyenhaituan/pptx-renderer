@@ -3,7 +3,7 @@ import { RenderContext } from '../RenderContext';
 import { resolveColorToHex } from './style';
 import { CHART_ACCENT_KEYS } from './types';
 
-export function parseChartColorMapOverride(chartXml: SafeXmlNode): Map<string, string> | undefined {
+function parseChartColorMapOverride(chartXml: SafeXmlNode): Map<string, string> | undefined {
   const clrMapOvr = chartXml.child('clrMapOvr');
   if (!clrMapOvr.exists()) return undefined;
 

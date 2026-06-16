@@ -14,7 +14,7 @@ export type RenderableNode =
   | GroupNodeData
   | ChartNodeData;
 
-export interface RenderableChildParseContext {
+interface RenderableChildParseContext {
   rels: Map<string, RelEntry>;
   partPath?: string;
   diagramDrawings?: Map<string, string>;

@@ -127,7 +127,7 @@ export function extractNumericValues(refNode: SafeXmlNode): number[] {
   return values;
 }
 
-export function extractNumericValuesAsStrings(cache: SafeXmlNode): string[] {
+function extractNumericValuesAsStrings(cache: SafeXmlNode): string[] {
   const pointLimit = getCachePointLimit(cache);
   const values: string[] = new Array(pointLimit).fill('');
 

@@ -71,7 +71,7 @@ export function extractLegendInfo(
   };
 }
 
-export function extractLegendManualLayout(
+function extractLegendManualLayout(
   legendNode: SafeXmlNode,
 ): Partial<Record<'left' | 'top' | 'width' | 'height', string>> {
   const manual = legendNode.child('layout').child('manualLayout');
