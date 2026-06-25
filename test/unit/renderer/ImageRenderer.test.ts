@@ -802,6 +802,24 @@ describe('renderImage', () => {
       expect(el.style.opacity).toBe('0.35');
     });
 
+    it('applies grayscale filter from grayscl blip effect (xcloud-intro slide 10)', () => {
+      const ctx = createCtxWithMedia();
+      const source = xmlNode(
+        `<pic xmlns="http://schemas.openxmlformats.org/drawingml/2006/main"
+              xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+          <nvPicPr><cNvPr id="1" name="grayscale icon"/><nvPr/></nvPicPr>
+          <blipFill><blip r:embed="rId1"><grayscl/></blip></blipFill>
+          <spPr><xfrm><off x="0" y="0"/><ext cx="0" cy="0"/></xfrm></spPr>
+        </pic>`,
+      );
+      const node = createPicNode({ source });
+
+      const el = renderImage(node, ctx);
+      const img = el.querySelector('img');
+
+      expect(img?.style.filter ?? '').toContain('grayscale(1)');
+    });
+
     it('attaches load listener for lum effect', () => {
       const ctx = createCtxWithMedia();
       const source = xmlNode(

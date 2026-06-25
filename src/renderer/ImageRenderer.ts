@@ -271,6 +271,12 @@ function renderImageUrl(
     wrapper.style.opacity = `${Number(blipOpacity.toFixed(4))}`;
   }
 
+  // Grayscale: render the image luminance-only.
+  const grayscl = blip.child('grayscl');
+  if (grayscl.exists()) {
+    appendCssFilter(img, 'grayscale(1)');
+  }
+
   // Duotone: recolor image (dark→color1, light→color2)
   const duotone = blip.child('duotone');
   if (duotone.exists()) {
