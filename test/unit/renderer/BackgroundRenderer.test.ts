@@ -231,6 +231,7 @@ describe('renderBackground', () => {
     expect(radial?.getAttribute('color-interpolation')).toBe('linearRGB');
     expect(radial?.getAttribute('cx')).toBe('1280');
     expect(radial?.getAttribute('cy')).toBe('720');
+    expect(Number(radial?.getAttribute('r'))).toBeCloseTo(Math.hypot(1280, 720), 4);
     expect(svg?.querySelectorAll('stop')).toHaveLength(4);
   });
 

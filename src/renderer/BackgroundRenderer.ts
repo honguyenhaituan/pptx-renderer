@@ -180,8 +180,7 @@ function renderSvgGradientBackground(
     radialGrad.setAttribute('cy', String(gcy * height));
     const maxDx = Math.max(gcx, 1 - gcx);
     const maxDy = Math.max(gcy, 1 - gcy);
-    const r = Math.sqrt(maxDx * maxDx + maxDy * maxDy);
-    radialGrad.setAttribute('r', String(r * Math.max(width, height)));
+    radialGrad.setAttribute('r', String(Math.hypot(maxDx * width, maxDy * height)));
     appendGradientStops(radialGrad, gradientFillData.stops);
     defs.appendChild(radialGrad);
 

@@ -1655,8 +1655,7 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
             // path="circle"/"shape": gradient reaches farthest corner
             const maxDx = Math.max(gcx, 1 - gcx);
             const maxDy = Math.max(gcy, 1 - gcy);
-            const r = Math.sqrt(maxDx * maxDx + maxDy * maxDy);
-            radialGrad.setAttribute('r', String(r * Math.max(svgW, svgH)));
+            radialGrad.setAttribute('r', String(Math.hypot(maxDx * svgW, maxDy * svgH)));
             for (const stop of gradientFillData.stops) {
               const svgStop = document.createElementNS(svgNs, 'stop');
               svgStop.setAttribute('offset', `${stop.position}%`);

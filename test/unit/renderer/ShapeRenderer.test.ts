@@ -3752,6 +3752,10 @@ describe('ShapeRenderer', () => {
     expect(defs).toBeTruthy();
     const radialGrad = defs?.querySelector('radialGradient');
     expect(radialGrad).toBeTruthy();
+    expect(Number(radialGrad?.getAttribute('r'))).toBeCloseTo(
+      Math.hypot(shapeNode.size.w / 2, shapeNode.size.h / 2),
+      4,
+    );
   });
 
   it('renders radial gradient with path="rect" using two linear gradients with lighten blend', () => {
