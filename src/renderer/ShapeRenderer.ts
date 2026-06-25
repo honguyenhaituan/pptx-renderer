@@ -1710,7 +1710,10 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
 
         defs.appendChild(linearGrad);
 
-        const strokeW = Math.max(gradientStroke.width, 1);
+        const strokeW =
+          isLineLike || svgW <= 1 || svgH <= 1
+            ? Math.max(gradientStroke.width, 1)
+            : gradientStroke.width;
         path.setAttribute('stroke', `url(#${gradId})`);
         path.setAttribute('stroke-width', String(strokeW));
         if (effectiveStrokeLinecap) path.setAttribute('stroke-linecap', effectiveStrokeLinecap);

@@ -3677,6 +3677,61 @@ describe('ShapeRenderer', () => {
     expect(linearGrad?.getAttribute('color-interpolation')).toBe('linearRGB');
   });
 
+  it('preserves sub-pixel gradient stroke width on non-line custom geometry (issue-3 skyline)', () => {
+    const xml = `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="205" name="Skyline"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="10147139" cy="1292783"/></a:xfrm>
+          <a:custGeom>
+            <a:avLst/>
+            <a:gdLst/>
+            <a:ahLst/>
+            <a:cxnLst/>
+            <a:rect l="0" t="0" r="r" b="b"/>
+            <a:pathLst>
+              <a:path w="10147139" h="1292783">
+                <a:moveTo><a:pt x="0" y="1292783"/></a:moveTo>
+                <a:lnTo><a:pt x="0" y="600000"/></a:lnTo>
+                <a:lnTo><a:pt x="1200000" y="600000"/></a:lnTo>
+                <a:lnTo><a:pt x="1200000" y="200000"/></a:lnTo>
+                <a:lnTo><a:pt x="2400000" y="200000"/></a:lnTo>
+                <a:lnTo><a:pt x="2400000" y="1292783"/></a:lnTo>
+                <a:close/>
+              </a:path>
+            </a:pathLst>
+          </a:custGeom>
+          <a:gradFill flip="none" rotWithShape="1">
+            <a:gsLst>
+              <a:gs pos="0"><a:schemeClr val="accent1"><a:alpha val="13000"/></a:schemeClr></a:gs>
+              <a:gs pos="100000"><a:schemeClr val="bg1"><a:alpha val="0"/></a:schemeClr></a:gs>
+            </a:gsLst>
+            <a:lin ang="5400000" scaled="1"/>
+            <a:tileRect/>
+          </a:gradFill>
+          <a:ln w="6350" cap="flat">
+            <a:gradFill flip="none" rotWithShape="1">
+              <a:gsLst>
+                <a:gs pos="0"><a:schemeClr val="accent1"><a:alpha val="0"/></a:schemeClr></a:gs>
+                <a:gs pos="47000"><a:schemeClr val="accent1"><a:alpha val="33000"/></a:schemeClr></a:gs>
+                <a:gs pos="100000"><a:schemeClr val="accent1"><a:alpha val="0"/></a:schemeClr></a:gs>
+              </a:gsLst>
+              <a:lin ang="0" scaled="1"/>
+              <a:tileRect/>
+            </a:gradFill>
+          </a:ln>
+        </p:spPr>
+      </p:sp>
+    `;
+    const shapeNode = parseShapeNode(parseXml(xml));
+    const el = renderShape(shapeNode, createMockRenderContext());
+    const path = el.querySelector('path[stroke^="url("]');
+
+    expect(path).toBeTruthy();
+    expect(Number(path?.getAttribute('stroke-width'))).toBeCloseTo(6350 / 9525, 5);
+  });
+
   it('uses shape bounds for non-line gradient stroke coordinates (xcloud-intro slide 13 trapezoid)', () => {
     const xml = `
       <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
