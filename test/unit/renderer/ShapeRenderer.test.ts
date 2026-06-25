@@ -2984,9 +2984,36 @@ describe('ShapeRenderer', () => {
     const filter = el.querySelector('filter');
 
     expect(el.style.boxShadow).toBe('');
-    expect(path?.getAttribute('filter')).toContain('url(#shape-shadow-');
+    expect(path?.getAttribute('filter') ?? '').toContain('url(#shape-shadow-');
     expect(filter).toBeTruthy();
     expect(filter?.querySelector('feDropShadow')).toBeTruthy();
+  });
+
+  it('keeps scaled-down outer shadows visible on non-line SVG paths (xcloud-plan slide 42)', () => {
+    const xml = `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="302" name="Scaled down shadow"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="2000000" cy="1000000"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+          <a:effectLst>
+            <a:outerShdw blurRad="317500" dist="127000" dir="5400000" sx="92000" sy="92000" algn="ctr" rotWithShape="0">
+              <a:srgbClr val="000000"><a:alpha val="45000"/></a:srgbClr>
+            </a:outerShdw>
+          </a:effectLst>
+        </p:spPr>
+      </p:sp>
+    `;
+
+    const el = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+    const path = el.querySelector('svg > path');
+    const dropShadow = el.querySelector('filter feDropShadow');
+
+    expect(path?.getAttribute('filter') ?? '').toContain('url(#shape-shadow-');
+    expect(dropShadow?.getAttribute('stdDeviation')).not.toBe('0.00');
+    expect(dropShadow?.getAttribute('flood-opacity')).not.toBe('0');
   });
 
   it('treats spAutoFit as bounded text fit to prevent overflow bleed', () => {

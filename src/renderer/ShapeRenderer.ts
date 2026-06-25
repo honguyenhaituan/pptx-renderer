@@ -2607,13 +2607,14 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
           if (a === 'r' || a === 'tr' || a === 'br') alignOffX = (-spreadBasisW * (scaleX - 1)) / 2;
         }
 
-        // When spread is tiny relative to blurPx, PowerPoint's Gaussian blur
-        // distributes energy across the full blur area.  The visible edge (only
-        // `spread` wide) receives only a fraction of the original alpha.
-        // Attenuate alpha accordingly so thin-edge shadows are nearly invisible.
-        const effectiveBlur = Math.min(blurPx, spread * 3);
+        // When a scaled-up shadow overhang is tiny relative to blurPx, PowerPoint's
+        // Gaussian blur distributes energy across the full blur area. The visible
+        // edge receives only a fraction of the original alpha. Scaled-down shadows
+        // still remain visible through their offset/blur, so do not attenuate them
+        // to zero just because they have no positive spread.
+        const effectiveBlur = spread > 0 ? Math.min(blurPx, spread * 3) : blurPx;
         let effectiveAlpha = shdAlpha;
-        if (blurPx > 0 && spread < blurPx) {
+        if (spread > 0 && blurPx > 0 && spread < blurPx) {
           effectiveAlpha = shdAlpha * (spread / blurPx);
         }
 
