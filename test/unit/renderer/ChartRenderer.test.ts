@@ -4066,9 +4066,9 @@ describe('ChartRenderer', () => {
       const series = (option.series as any[])?.[0];
       const formatter = series?.label?.formatter;
       expect(typeof formatter).toBe('function');
-      // 1234.7 rounded → "1235"
+      // 1234.7 rounded and formatted with thousands separators -> "1,235"
       const result = formatter({ value: 1234.7 });
-      expect(result).toBe('1235');
+      expect(result).toBe('1,235');
     });
 
     it('should use fallback format for unrecognized formatCode with non-integer value', () => {
@@ -7205,6 +7205,53 @@ describe('ChartRenderer', () => {
       const cells = Array.from(el.querySelectorAll('tbody td')).map((td) => td.textContent);
 
       expect(cells).toEqual(['S', '1.3', '2.5', '']);
+    });
+
+    it('keeps per-series data table formats through the chart render path', () => {
+      const xml = `
+        <c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+                      xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <c:chart>
+            <c:plotArea>
+              <c:barChart>
+                <c:ser>
+                  <c:idx val="0"/><c:order val="0"/>
+                  <c:tx><c:v>Percent</c:v></c:tx>
+                  <c:cat><c:strRef><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>A</c:v></c:pt></c:strCache></c:strRef></c:cat>
+                  <c:val><c:numRef><c:numCache><c:formatCode>0%</c:formatCode><c:ptCount val="1"/><c:pt idx="0"><c:v>0.25</c:v></c:pt></c:numCache></c:numRef></c:val>
+                </c:ser>
+                <c:ser>
+                  <c:idx val="1"/><c:order val="1"/>
+                  <c:tx><c:v>Count</c:v></c:tx>
+                  <c:cat><c:strRef><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>A</c:v></c:pt></c:strCache></c:strRef></c:cat>
+                  <c:val><c:numRef><c:numCache><c:formatCode>#,##0</c:formatCode><c:ptCount val="1"/><c:pt idx="0"><c:v>1234</c:v></c:pt></c:numCache></c:numRef></c:val>
+                </c:ser>
+                <c:axId val="1"/><c:axId val="2"/>
+              </c:barChart>
+              <c:dTable><c:showKeys val="0"/></c:dTable>
+              <c:catAx><c:axId val="1"/><c:crossAx val="2"/></c:catAx>
+              <c:valAx><c:axId val="2"/><c:crossAx val="1"/></c:valAx>
+            </c:plotArea>
+          </c:chart>
+        </c:chartSpace>`;
+      const node = {
+        id: 'chart',
+        name: 'chart',
+        nodeType: 'chart',
+        chartPath: 'ppt/charts/chart1.xml',
+        position: { x: 0, y: 0 },
+        size: { w: 300, h: 220 },
+        rotation: 0,
+        flipH: false,
+        flipV: false,
+      } satisfies ChartNodeData;
+      const ctx = createMockRenderContext();
+      ctx.presentation.charts.set('ppt/charts/chart1.xml', parseXml(xml));
+
+      const el = renderChart(node, ctx);
+      const cells = Array.from(el.querySelectorAll('tbody td')).map((td) => td.textContent);
+
+      expect(cells).toEqual(['Percent', '25%', 'Count', '1,234']);
     });
 
     it('keeps missing bar chart points as gaps instead of synthetic zero values', () => {

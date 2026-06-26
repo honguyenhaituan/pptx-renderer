@@ -2309,7 +2309,6 @@ export function parseChartXml(
       ? {
           seriesArr: dataTableSeries,
           showKeys: dTableMeta.showKeys,
-          formatCode: dataTableSeries.find((s) => s.formatCode)?.formatCode,
         }
       : undefined;
 

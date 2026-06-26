@@ -79,6 +79,85 @@ export function extractFormatCode(refNode: SafeXmlNode): string | undefined {
   return text || undefined;
 }
 
+function splitFormatSections(formatCode: string): string[] {
+  const sections: string[] = [];
+  let current = '';
+  let inQuote = false;
+
+  for (let i = 0; i < formatCode.length; i++) {
+    const ch = formatCode[i];
+    if (ch === '"') {
+      inQuote = !inQuote;
+      current += ch;
+      continue;
+    }
+    if (ch === ';' && !inQuote) {
+      sections.push(current);
+      current = '';
+      continue;
+    }
+    current += ch;
+  }
+
+  sections.push(current);
+  return sections;
+}
+
+function normalizeNumericFormatSection(section: string): string {
+  const withoutDirectives = section.replace(/\[[^\]]+\]/g, '');
+  let normalized = '';
+
+  for (let i = 0; i < withoutDirectives.length; i++) {
+    const ch = withoutDirectives[i];
+
+    if (ch === '"') {
+      i++;
+      while (i < withoutDirectives.length && withoutDirectives[i] !== '"') i++;
+      continue;
+    }
+
+    if (ch === '\\') {
+      if (i + 1 < withoutDirectives.length) normalized += withoutDirectives[++i];
+      continue;
+    }
+
+    if (ch === '_' || ch === '*') {
+      i++;
+      continue;
+    }
+
+    normalized += ch;
+  }
+
+  return normalized.trim();
+}
+
+function formatOfficeNumber(value: number, formatCode: string): string | undefined {
+  const sections = splitFormatSections(formatCode);
+  const useNegativeSection = value < 0 && sections.length > 1;
+  const section = useNegativeSection ? sections[1] : sections[0];
+  const normalized = normalizeNumericFormatSection(section);
+
+  if (!/[#0]/.test(normalized) || (!normalized.includes(',') && sections.length === 1)) {
+    return undefined;
+  }
+
+  const decimalMatch = normalized.match(/\.(0+|#+)/);
+  const decimals = decimalMatch ? decimalMatch[1].length : 0;
+  const useThousands = normalized.includes(',');
+  const numericValue = useNegativeSection ? Math.abs(value) : value;
+  const formatted = numericValue.toLocaleString('en-US', {
+    useGrouping: useThousands,
+    minimumFractionDigits: decimalMatch?.[1].includes('0') ? decimals : 0,
+    maximumFractionDigits: decimals,
+  });
+
+  if (!useNegativeSection) return formatted;
+  if (normalized.includes('(') && normalized.includes(')')) return `(${formatted})`;
+  if (normalized.includes('-')) return `-${formatted}`;
+  return formatted;
+}
+
 export function formatValue(value: number, formatCode: string | undefined): string {
   if (!formatCode || formatCode === 'General') {
     if (Number.isInteger(value)) return String(value);
@@ -91,6 +170,9 @@ export function formatValue(value: number, formatCode: string | undefined): stri
     const pctValue = value * 100;
     return `${pctValue.toFixed(decimals)}%`;
   }
+
+  const officeNumber = formatOfficeNumber(value, formatCode);
+  if (officeNumber !== undefined) return officeNumber;
 
   const decMatch = formatCode.match(/\.(0+|#+)/);
   if (decMatch) {
