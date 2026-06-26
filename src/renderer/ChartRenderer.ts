@@ -1635,6 +1635,24 @@ function looksLikeDateCategory(label: string): boolean {
   return /^\d{4}[/-]\d{1,2}[/-]\d{1,2}$/.test(label.trim());
 }
 
+function stockMarkerSymbolToLegendIcon(symbol: string | undefined): string {
+  switch (symbol) {
+    case 'dot':
+    case 'circle':
+      return 'circle';
+    case 'square':
+      return 'rect';
+    case 'diamond':
+    case 'triangle':
+      return symbol;
+    case 'none':
+    case undefined:
+      return 'none';
+    default:
+      return 'circle';
+  }
+}
+
 function buildStockChartOption(
   chartTypeNode: SafeXmlNode,
   chartNode: SafeXmlNode,
@@ -1736,7 +1754,10 @@ function buildStockChartOption(
   const isHlc = seriesArr.length >= 3 && seriesArr.length < 4;
 
   const legendData = isHlc
-    ? seriesArr.slice(0, 3).map((s) => ({ name: s.name, icon: 'none' }))
+    ? seriesArr.slice(0, 3).map((s, idx) => ({
+        name: s.name,
+        icon: idx === 2 ? stockMarkerSymbolToLegendIcon(s.markerSymbol) : 'none',
+      }))
     : seriesArr.map((s) => s.name);
 
   const series: echarts.SeriesOption[] = isHlc

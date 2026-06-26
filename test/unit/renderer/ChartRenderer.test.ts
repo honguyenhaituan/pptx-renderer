@@ -2737,6 +2737,7 @@ describe('ChartRenderer', () => {
       const series = option.series as any[];
       expect(series.length).toBeGreaterThan(0);
     });
+
   });
 
   // ==========================================================================
@@ -5396,6 +5397,7 @@ describe('ChartRenderer', () => {
                 <c:ser>
                   <c:idx val="2"/><c:order val="2"/>
                   <c:tx><c:strRef><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>Close</c:v></c:pt></c:strCache></c:strRef></c:tx>
+                  <c:marker><c:symbol val="dot"/><c:size val="3"/></c:marker>
                   <c:val><c:numRef><c:numCache><c:ptCount val="1"/>
                     <c:pt idx="0"><c:v>35</c:v></c:pt>
                   </c:numCache></c:numRef></c:val>
@@ -5420,8 +5422,12 @@ describe('ChartRenderer', () => {
       expect(series[0].type).toBe('custom');
       expect(typeof series[0].renderItem).toBe('function');
       expect(series[0].data[0]).toEqual([0, 50, 20, 35]);
-      expect(legend.icon).toBe('none');
-      expect(legend.data).toEqual(['High', 'Low', 'Close']);
+      expect(legend.icon).toBeUndefined();
+      expect(legend.data).toEqual([
+        { name: 'High', icon: 'none' },
+        { name: 'Low', icon: 'none' },
+        { name: 'Close', icon: 'circle' },
+      ]);
 
       const rendered = series[0].renderItem(
         {},
