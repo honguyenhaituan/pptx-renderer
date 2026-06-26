@@ -495,7 +495,7 @@ function resolveGradient(
   // Sort stops by position
   stops.sort((a, b) => a.position - b.position);
 
-  const stopsStr = stops.map((s) => `${s.color} ${s.position.toFixed(1)}%`).join(', ');
+  const stopsStr = formatGradientStops(stops);
 
   // Determine gradient type
   const lin = gradFill.child('lin');
@@ -516,27 +516,26 @@ function resolveGradient(
       // Conventions match — no reversal needed.
 
       // Resolve fillToRect center point
-      const ftr = path.child('fillToRect');
-      let cx = 50;
-      let cy = 50;
-      if (ftr.exists()) {
-        const l = (ftr.numAttr('l') ?? 0) / 100000;
-        const t = (ftr.numAttr('t') ?? 0) / 100000;
-        const r = (ftr.numAttr('r') ?? 0) / 100000;
-        const b = (ftr.numAttr('b') ?? 0) / 100000;
-        cx = ((l + (1 - r)) / 2) * 100;
-        cy = ((t + (1 - b)) / 2) * 100;
-      }
+      const fillToRect = parseFillToRect(path);
+      const { cx, cy } = getFillToRectCenter(fillToRect);
+      const pathStopsStr = formatGradientStops(
+        getFocusedGradientStops({
+          stops,
+          cx,
+          cy,
+          fillToRect,
+        }),
+      );
 
       if (pathType === 'rect') {
         // Rectangular gradient (L∞ norm / Chebyshev distance): creates cross/X contour
         // pattern. CSS can't do this natively; approximate by overlaying horizontal and
         // vertical linear gradients with a radial gradient as fallback.
         // The SVG path in ShapeRenderer uses the proper blend approach.
-        return `radial-gradient(closest-side at ${cx.toFixed(1)}% ${cy.toFixed(1)}%, ${stopsStr})`;
+        return `radial-gradient(closest-side at ${(cx * 100).toFixed(1)}% ${(cy * 100).toFixed(1)}%, ${pathStopsStr})`;
       }
 
-      return `radial-gradient(ellipse at ${cx.toFixed(1)}% ${cy.toFixed(1)}%, ${stopsStr})`;
+      return `radial-gradient(ellipse at ${(cx * 100).toFixed(1)}% ${(cy * 100).toFixed(1)}%, ${pathStopsStr})`;
     }
   }
 
@@ -688,6 +687,88 @@ export interface GradientFillData {
   cy?: number;
   /** OOXML path type for radial gradients: 'rect', 'circle', or 'shape'. */
   pathType?: string;
+  /** OOXML fillToRect focus rectangle, expressed as relative offsets from the tile edge. */
+  fillToRect?: GradientFocusRect;
+}
+
+export interface GradientFocusRect {
+  l: number;
+  t: number;
+  r: number;
+  b: number;
+}
+
+function parseFillToRect(path: SafeXmlNode): GradientFocusRect | undefined {
+  const ftr = path.child('fillToRect');
+  if (!ftr.exists()) return undefined;
+  return {
+    l: (ftr.numAttr('l') ?? 0) / 100000,
+    t: (ftr.numAttr('t') ?? 0) / 100000,
+    r: (ftr.numAttr('r') ?? 0) / 100000,
+    b: (ftr.numAttr('b') ?? 0) / 100000,
+  };
+}
+
+function getFillToRectCenter(fillToRect: GradientFocusRect | undefined): {
+  cx: number;
+  cy: number;
+} {
+  if (!fillToRect) return { cx: 0.5, cy: 0.5 };
+  return {
+    cx: (fillToRect.l + (1 - fillToRect.r)) / 2,
+    cy: (fillToRect.t + (1 - fillToRect.b)) / 2,
+  };
+}
+
+function clampUnit(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+export function getGradientFocusOffset(
+  gradientFillData: Pick<GradientFillData, 'fillToRect' | 'cx' | 'cy'>,
+  options: { axis?: 'x' | 'y' | 'radial'; width?: number; height?: number } = {},
+): number {
+  const fillToRect = gradientFillData.fillToRect;
+  if (!fillToRect) return 0;
+
+  const focusW = Math.max(0, 1 - fillToRect.l - fillToRect.r);
+  const focusH = Math.max(0, 1 - fillToRect.t - fillToRect.b);
+  if (focusW <= 0 && focusH <= 0) return 0;
+
+  const cx = gradientFillData.cx ?? 0.5;
+  const cy = gradientFillData.cy ?? 0.5;
+  const maxX = Math.max(Math.abs(cx), Math.abs(1 - cx));
+  const maxY = Math.max(Math.abs(cy), Math.abs(1 - cy));
+
+  if (options.axis === 'x') {
+    return maxX > 0 ? clampUnit(focusW / 2 / maxX) : 0;
+  }
+  if (options.axis === 'y') {
+    return maxY > 0 ? clampUnit(focusH / 2 / maxY) : 0;
+  }
+
+  const width = options.width ?? 1;
+  const height = options.height ?? 1;
+  const innerRadius = Math.hypot((focusW / 2) * width, (focusH / 2) * height);
+  const outerRadius = Math.hypot(maxX * width, maxY * height);
+  return outerRadius > 0 ? clampUnit(innerRadius / outerRadius) : 0;
+}
+
+export function getFocusedGradientStops(
+  gradientFillData: Pick<GradientFillData, 'stops' | 'fillToRect' | 'cx' | 'cy'>,
+  options: { axis?: 'x' | 'y' | 'radial'; width?: number; height?: number } = {},
+): Array<{ position: number; color: string }> {
+  const focusOffset = getGradientFocusOffset(gradientFillData, options);
+  if (focusOffset <= 0) return gradientFillData.stops;
+
+  return gradientFillData.stops.map((stop) => ({
+    ...stop,
+    position: focusOffset * 100 + stop.position * (1 - focusOffset),
+  }));
+}
+
+function formatGradientStops(stops: Array<{ position: number; color: string }>): string {
+  return stops.map((s) => `${s.color} ${s.position.toFixed(1)}%`).join(', ');
 }
 
 function resolveGradientFillNode(
@@ -718,17 +799,8 @@ function resolveGradientFillNode(
   if (path.exists()) {
     const pathType = path.attr('path');
     if (pathType === 'circle' || pathType === 'shape' || pathType === 'rect') {
-      const ftr = path.child('fillToRect');
-      let cx = 0.5;
-      let cy = 0.5;
-      if (ftr.exists()) {
-        const l = (ftr.numAttr('l') ?? 0) / 100000;
-        const t = (ftr.numAttr('t') ?? 0) / 100000;
-        const r = (ftr.numAttr('r') ?? 0) / 100000;
-        const b = (ftr.numAttr('b') ?? 0) / 100000;
-        cx = (l + (1 - r)) / 2;
-        cy = (t + (1 - b)) / 2;
-      }
+      const fillToRect = parseFillToRect(path);
+      const { cx, cy } = getFillToRectCenter(fillToRect);
       return {
         type: 'radial',
         stops,
@@ -736,6 +808,7 @@ function resolveGradientFillNode(
         cx,
         cy,
         pathType: pathType,
+        fillToRect,
         colorInterpolation: 'linearRGB',
       };
     }

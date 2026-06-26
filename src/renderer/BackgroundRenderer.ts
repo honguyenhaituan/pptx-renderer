@@ -9,6 +9,7 @@ import {
   resolveFill,
   resolveGradientFill,
   resolveThemeBackgroundFillReference,
+  getFocusedGradientStops,
   type GradientFillData,
 } from './StyleResolver';
 import { hexToRgb } from '../utils/color';
@@ -106,9 +107,10 @@ function renderSvgGradientBackground(
   if (gradientFillData.type === 'radial' && gradientFillData.pathType === 'rect') {
     const gcx = gradientFillData.cx ?? 0.5;
     const gcy = gradientFillData.cy ?? 0.5;
-    const mirrorStops = (centerFrac: number) => {
+    const mirrorStops = (centerFrac: number, axis: 'x' | 'y') => {
+      const focusedStops = getFocusedGradientStops(gradientFillData, { axis });
       const mirrored: Array<{ offset: number; color: string }> = [];
-      for (const stop of gradientFillData.stops) {
+      for (const stop of focusedStops) {
         const t = stop.position / 100;
         mirrored.push({ offset: centerFrac - t * centerFrac, color: stop.color });
         mirrored.push({ offset: centerFrac + t * (1 - centerFrac), color: stop.color });
@@ -124,7 +126,7 @@ function renderSvgGradientBackground(
     hGrad.setAttribute('y1', '0%');
     hGrad.setAttribute('x2', '100%');
     hGrad.setAttribute('y2', '0%');
-    for (const stop of mirrorStops(gcx)) {
+    for (const stop of mirrorStops(gcx, 'x')) {
       const svgStop = document.createElementNS(svgNs, 'stop');
       svgStop.setAttribute('offset', `${(stop.offset * 100).toFixed(2)}%`);
       svgStop.setAttribute('stop-color', stop.color);
@@ -140,7 +142,7 @@ function renderSvgGradientBackground(
     vGrad.setAttribute('y1', '0%');
     vGrad.setAttribute('x2', '0%');
     vGrad.setAttribute('y2', '100%');
-    for (const stop of mirrorStops(gcy)) {
+    for (const stop of mirrorStops(gcy, 'y')) {
       const svgStop = document.createElementNS(svgNs, 'stop');
       svgStop.setAttribute('offset', `${(stop.offset * 100).toFixed(2)}%`);
       svgStop.setAttribute('stop-color', stop.color);
@@ -181,7 +183,7 @@ function renderSvgGradientBackground(
     const maxDx = Math.max(gcx, 1 - gcx);
     const maxDy = Math.max(gcy, 1 - gcy);
     radialGrad.setAttribute('r', String(Math.hypot(maxDx * width, maxDy * height)));
-    appendGradientStops(radialGrad, gradientFillData.stops);
+    appendGradientStops(radialGrad, getFocusedGradientStops(gradientFillData, { width, height }));
     defs.appendChild(radialGrad);
 
     const rect = document.createElementNS(svgNs, 'rect');

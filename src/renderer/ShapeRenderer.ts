@@ -108,6 +108,7 @@ import {
   resolveColorToCss,
   resolveColor,
   resolveThemeFillReference,
+  getFocusedGradientStops,
 } from './StyleResolver';
 import { renderTextBody } from './TextRenderer';
 import { renderCustomGeometry } from '../shapes/customGeometry';
@@ -1544,13 +1545,13 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
             // (per-channel max). max(dx, dy) = L∞ norm = rectangular contours.
             const gcx = gradientFillData.cx ?? 0.5;
             const gcy = gradientFillData.cy ?? 0.5;
-            const stops = gradientFillData.stops;
 
             // Mirror stops for center-out: original stop at N% → two stops at
             // (center - N%*distToEdge) and (center + N%*distToEdge) in gradient coords.
-            const mirrorStops = (centerFrac: number) => {
+            const mirrorStops = (centerFrac: number, axis: 'x' | 'y') => {
+              const focusedStops = getFocusedGradientStops(gradientFillData, { axis });
               const mirrored: Array<{ offset: number; color: string }> = [];
-              for (const s of stops) {
+              for (const s of focusedStops) {
                 const t = s.position / 100; // 0..1 from center to edge
                 const below = centerFrac - t * centerFrac;
                 const above = centerFrac + t * (1 - centerFrac);
@@ -1573,7 +1574,7 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
             hGrad.setAttribute('y1', '0%');
             hGrad.setAttribute('x2', '100%');
             hGrad.setAttribute('y2', '0%');
-            for (const ms of mirrorStops(gcx)) {
+            for (const ms of mirrorStops(gcx, 'x')) {
               const svgStop = document.createElementNS(svgNs, 'stop');
               svgStop.setAttribute('offset', `${(ms.offset * 100).toFixed(2)}%`);
               svgStop.setAttribute('stop-color', ms.color);
@@ -1593,7 +1594,7 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
             vGrad.setAttribute('y1', '0%');
             vGrad.setAttribute('x2', '0%');
             vGrad.setAttribute('y2', '100%');
-            for (const ms of mirrorStops(gcy)) {
+            for (const ms of mirrorStops(gcy, 'y')) {
               const svgStop = document.createElementNS(svgNs, 'stop');
               svgStop.setAttribute('offset', `${(ms.offset * 100).toFixed(2)}%`);
               svgStop.setAttribute('stop-color', ms.color);
@@ -1656,7 +1657,10 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
             const maxDx = Math.max(gcx, 1 - gcx);
             const maxDy = Math.max(gcy, 1 - gcy);
             radialGrad.setAttribute('r', String(Math.hypot(maxDx * svgW, maxDy * svgH)));
-            for (const stop of gradientFillData.stops) {
+            for (const stop of getFocusedGradientStops(gradientFillData, {
+              width: svgW,
+              height: svgH,
+            })) {
               const svgStop = document.createElementNS(svgNs, 'stop');
               svgStop.setAttribute('offset', `${stop.position}%`);
               svgStop.setAttribute('stop-color', stop.color);

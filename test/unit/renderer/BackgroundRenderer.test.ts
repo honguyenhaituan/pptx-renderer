@@ -636,6 +636,33 @@ describe('renderBackground', () => {
     expect(container.style.backgroundColor).toMatch(/#223344|rgb\(34,\s*51,\s*68\)/i);
   });
 
+  it('uses fillToRect as the center shade area for SVG background gradients', () => {
+    const bg = bgPrXml(`
+      <a:gradFill>
+        <a:gsLst>
+          <a:gs pos="0"><a:srgbClr val="FFFFFF"/></a:gs>
+          <a:gs pos="100000"><a:srgbClr val="000000"/></a:gs>
+        </a:gsLst>
+        <a:path path="circle">
+          <a:fillToRect l="25000" t="25000" r="25000" b="25000"/>
+        </a:path>
+      </a:gradFill>
+    `);
+    const ctx = createMockRenderContext({
+      slide: { rels: new Map(), background: bg } as any,
+      presentation: {
+        ...createMockRenderContext().presentation,
+        width: 1280,
+        height: 720,
+      },
+    });
+
+    renderBackground(ctx, container);
+
+    const stops = Array.from(container.querySelectorAll('radialGradient stop'));
+    expect(stops.map((stop) => stop.getAttribute('offset'))).toEqual(['50%', '100%']);
+  });
+
   it('renders bgRef idx through the theme fill style instead of flattening to color', () => {
     const bg = bgRefXml(1002, `<a:schemeClr val="accent1"/>`);
     const ctx = createMockRenderContext({

@@ -3758,6 +3758,31 @@ describe('ShapeRenderer', () => {
     );
   });
 
+  it('uses fillToRect as the center shade area for radial shape gradients', () => {
+    const xml = `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="204" name="RadialFocus"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="2000000" cy="1000000"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:gradFill path="circle">
+            <a:gsLst>
+              <a:gs pos="0"><a:srgbClr val="FFFFFF"/></a:gs>
+              <a:gs pos="100000"><a:srgbClr val="000000"/></a:gs>
+            </a:gsLst>
+            <a:path path="circle"><a:fillToRect l="25000" t="25000" r="25000" b="25000"/></a:path>
+          </a:gradFill>
+        </p:spPr>
+      </p:sp>
+    `;
+    const shapeNode = parseShapeNode(parseXml(xml));
+    const el = renderShape(shapeNode, createMockRenderContext());
+    const stops = Array.from(el.querySelectorAll('radialGradient stop'));
+
+    expect(stops.map((stop) => stop.getAttribute('offset'))).toEqual(['50%', '100%']);
+  });
+
   it('renders radial gradient with path="rect" using two linear gradients with lighten blend', () => {
     const xml = `
       <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
@@ -3791,6 +3816,34 @@ describe('ShapeRenderer', () => {
     // Should have blend group with lighten somewhere in the SVG
     const blendGroup = svg?.querySelector('g[style*="isolation"]');
     expect(blendGroup).toBeTruthy();
+  });
+
+  it('preserves fillToRect focus width for rectangular path gradients', () => {
+    const xml = `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="205" name="RectFocus"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="2000000" cy="1000000"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:gradFill path="rect">
+            <a:gsLst>
+              <a:gs pos="0"><a:srgbClr val="FFFFFF"/></a:gs>
+              <a:gs pos="100000"><a:srgbClr val="808080"/></a:gs>
+            </a:gsLst>
+            <a:path path="rect"><a:fillToRect l="25000" t="25000" r="25000" b="25000"/></a:path>
+          </a:gradFill>
+        </p:spPr>
+      </p:sp>
+    `;
+    const shapeNode = parseShapeNode(parseXml(xml));
+    const el = renderShape(shapeNode, createMockRenderContext());
+    const horizontalStops = Array.from(
+      el.querySelectorAll('linearGradient[id$="-h"] stop'),
+    ).map((stop) => stop.getAttribute('offset'));
+
+    expect(horizontalStops).toContain('25.00%');
+    expect(horizontalStops).toContain('75.00%');
   });
 
   it('renders gradient stroke on shape', () => {
