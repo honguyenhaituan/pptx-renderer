@@ -63,6 +63,10 @@ export function extractLegendInfo(
         ...(s.fontSize !== undefined ? { fontSize: s.fontSize } : {}),
         ...(s.bold === true ? { fontWeight: 'bold' } : {}),
         ...(s.fontFamily ? { fontFamily: s.fontFamily } : {}),
+        ...(s.textShadowColor ? { textShadowColor: s.textShadowColor } : {}),
+        ...(s.textShadowBlur !== undefined ? { textShadowBlur: s.textShadowBlur } : {}),
+        ...(s.textShadowOffsetX !== undefined ? { textShadowOffsetX: s.textShadowOffsetX } : {}),
+        ...(s.textShadowOffsetY !== undefined ? { textShadowOffsetY: s.textShadowOffsetY } : {}),
       };
       if (hasExplicitFontSize(s)) textStyle[EXPLICIT_FONT_SIZE] = true;
       return textStyle;

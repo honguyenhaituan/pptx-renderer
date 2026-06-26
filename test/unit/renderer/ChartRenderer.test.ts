@@ -362,6 +362,31 @@ describe('ChartRenderer', () => {
       expect(legend?.textStyle?.fontSize).toBe(12);
     });
 
+    it('should apply legend text outer shadow from legend txPr defRPr effectLst', () => {
+      const legendTxPr = `
+        <a:bodyPr/>
+        <a:lstStyle/>
+        <a:p>
+          <a:pPr>
+            <a:defRPr sz="900">
+              <a:effectLst>
+                <a:outerShdw blurRad="38100" dist="38100" dir="2700000" algn="tl">
+                  <a:srgbClr val="333333"><a:alpha val="50000"/></a:srgbClr>
+                </a:outerShdw>
+              </a:effectLst>
+            </a:defRPr>
+          </a:pPr>
+        </a:p>`;
+      const xml = buildChartSpaceXml({ hasLegend: true, legendPos: 'b', legendTxPr });
+      const { option } = parseChartOption(xml);
+      const legend = option.legend as any;
+
+      expect(legend?.textStyle?.textShadowColor).toBe('rgba(51,51,51,0.500)');
+      expect(legend.textStyle.textShadowBlur).toBeCloseTo(4);
+      expect(legend.textStyle.textShadowOffsetX).toBeCloseTo(2.8, 1);
+      expect(legend.textStyle.textShadowOffsetY).toBeCloseTo(2.8, 1);
+    });
+
     it('should resolve theme font placeholders from legend txPr defRPr', () => {
       const legendTxPr = `
         <a:bodyPr/>
@@ -1111,6 +1136,36 @@ describe('ChartRenderer', () => {
       const title = option.title as any;
       expect(title?.textStyle?.fontSize).toBe(18);
       expect(title?.textStyle?.color).toMatch(/[1]{1}[2]{1}[3]{1}[4]{1}[5]{1}[6]{1}|#123456/i);
+    });
+
+    it('should apply title text outer shadow from title txPr defRPr effectLst', () => {
+      const titleTxPr = `
+        <a:bodyPr/>
+        <a:lstStyle/>
+        <a:p>
+          <a:pPr>
+            <a:defRPr sz="1400">
+              <a:effectLst>
+                <a:outerShdw blurRad="38100" dist="38100" dir="2700000" algn="tl">
+                  <a:srgbClr val="333333"><a:alpha val="50000"/></a:srgbClr>
+                </a:outerShdw>
+              </a:effectLst>
+            </a:defRPr>
+          </a:pPr>
+        </a:p>`;
+      const xml = buildChartSpaceXml({
+        hasLegend: false,
+        autoTitleDeleted: false,
+        titleText: 'Shadowed Chart',
+        titleTxPr,
+      });
+      const { option } = parseChartOption(xml);
+      const title = option.title as any;
+
+      expect(title?.textStyle?.textShadowColor).toBe('rgba(51,51,51,0.500)');
+      expect(title.textStyle.textShadowBlur).toBeCloseTo(4);
+      expect(title.textStyle.textShadowOffsetX).toBeCloseTo(2.8, 1);
+      expect(title.textStyle.textShadowOffsetY).toBeCloseTo(2.8, 1);
     });
 
     it('should apply title rich text style when title txPr is omitted', () => {

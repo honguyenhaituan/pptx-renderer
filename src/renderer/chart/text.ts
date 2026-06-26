@@ -1,7 +1,9 @@
 import { SafeXmlNode } from '../../parser/XmlParser';
 import { parseOoxmlBool } from '../../parser/booleans';
+import { emuToPx } from '../../parser/units';
 import { cssFontFamilyStack, resolveThemeFontStack } from '../fontResolver';
 import { RenderContext } from '../RenderContext';
+import { resolveColor } from '../StyleResolver';
 import { resolveColorToHex } from './style';
 import { EXPLICIT_FONT_SIZE, type ChartTextStyle } from './types';
 
@@ -57,6 +59,51 @@ export function extractTxPrColor(parentNode: SafeXmlNode, ctx: RenderContext): s
   return undefined;
 }
 
+function hexToRgbInternal(hex: string): { r: number; g: number; b: number } {
+  const cleaned = hex.replace(/^#/, '');
+  const expanded =
+    cleaned.length === 3
+      ? cleaned[0] + cleaned[0] + cleaned[1] + cleaned[1] + cleaned[2] + cleaned[2]
+      : cleaned;
+  const num = parseInt(expanded, 16);
+  return { r: (num >> 16) & 0xff, g: (num >> 8) & 0xff, b: num & 0xff };
+}
+
+function colorToCss(color: string, alpha: number): string {
+  const hex = color.startsWith('#') ? color : `#${color}`;
+  if (alpha >= 1) return hex;
+  const { r, g, b } = hexToRgbInternal(hex);
+  return `rgba(${r},${g},${b},${alpha.toFixed(3)})`;
+}
+
+function extractTextOuterShadow(
+  defRPr: SafeXmlNode,
+  ctx: RenderContext,
+): Partial<ChartTextStyle> | undefined {
+  const outerShdw = defRPr.child('effectLst').child('outerShdw');
+  if (!outerShdw.exists()) return undefined;
+
+  try {
+    const { color, alpha } = resolveColor(outerShdw, ctx);
+    if (!color || alpha <= 0) return undefined;
+
+    const distPx = emuToPx(outerShdw.numAttr('dist') ?? 0);
+    const blurPx = emuToPx(outerShdw.numAttr('blurRad') ?? 0);
+    const dirDeg = (outerShdw.numAttr('dir') ?? 0) / 60000;
+    const offsetX = distPx * Math.cos((dirDeg * Math.PI) / 180);
+    const offsetY = distPx * Math.sin((dirDeg * Math.PI) / 180);
+
+    return {
+      textShadowColor: colorToCss(color, alpha),
+      textShadowBlur: blurPx,
+      textShadowOffsetX: offsetX,
+      textShadowOffsetY: offsetY,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
 function extractDefRPrStyle(defRPr: SafeXmlNode, ctx: RenderContext): ChartTextStyle | undefined {
   if (!defRPr.exists()) return undefined;
 
@@ -83,11 +130,14 @@ function extractDefRPrStyle(defRPr: SafeXmlNode, ctx: RenderContext): ChartTextS
   if (fontStack.length > 0) {
     style.fontFamily = cssFontFamilyStack(fontStack);
   }
+  const shadowStyle = extractTextOuterShadow(defRPr, ctx);
+  if (shadowStyle) Object.assign(style, shadowStyle);
 
   return style.color ||
     style.fontSize !== undefined ||
     style.bold !== undefined ||
-    style.fontFamily !== undefined
+    style.fontFamily !== undefined ||
+    style.textShadowColor !== undefined
     ? style
     : undefined;
 }

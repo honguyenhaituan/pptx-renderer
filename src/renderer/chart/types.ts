@@ -95,6 +95,10 @@ export type ChartTextStyle = {
   fontSize?: number;
   bold?: boolean;
   fontFamily?: string;
+  textShadowColor?: string;
+  textShadowBlur?: number;
+  textShadowOffsetX?: number;
+  textShadowOffsetY?: number;
   [EXPLICIT_FONT_SIZE]?: true;
 };
 
