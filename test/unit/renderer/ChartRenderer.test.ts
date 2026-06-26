@@ -6686,7 +6686,8 @@ describe('ChartRenderer', () => {
       expect(series.every((s) => s.areaStyle?.opacity === 1)).toBe(true);
       expect(series.every((s) => s.showSymbol === false)).toBe(true);
       expect(legend.icon).toBe('rect');
-      expect(legend.data).toEqual(['A', 'B']);
+      expect(legend.data.map((item: any) => item.name)).toEqual(['B', 'A']);
+      expect(legend.data.map((item: any) => item.itemStyle.color)).toEqual(['#ED7D31', '#4472C4']);
       expect(xAxis.boundaryGap).toBe(false);
       expect(yAxis.interval).toBe(2);
       expect(yAxis.max).toBe(14);
@@ -6753,15 +6754,19 @@ describe('ChartRenderer', () => {
             <c:catAx><c:axId val="1"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:crossAx val="2"/></c:catAx>
             <c:valAx><c:axId val="2"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:crossAx val="1"/></c:valAx>
           </c:plotArea>
+          <c:legend><c:legendPos val="r"/></c:legend>
         </c:chart>
       </c:chartSpace>`;
 
       const { option } = parseChartOption(xml);
       const series = option.series as any[];
       const xAxis = option.xAxis as any;
+      const legend = option.legend as any;
 
       expect(series.map((s) => s.stack)).toEqual(['total', 'total']);
       expect(xAxis.boundaryGap).toBeUndefined();
+      expect(legend.data.map((item: any) => item.name)).toEqual(['B', 'A']);
+      expect(legend.data.map((item: any) => item.lineStyle.color)).toEqual(['#ED7D31', '#4472C4']);
     });
 
     it('applies maxMin axis orientation as ECharts inverse axes', () => {

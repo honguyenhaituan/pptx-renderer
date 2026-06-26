@@ -821,6 +821,7 @@ function buildLineChartOption(
   seriesArr: SeriesData[],
   ctx: RenderContext,
   isArea: boolean,
+  chartPalette?: string[],
 ): echarts.EChartsOption {
   const categories = seriesArr.find((s) => s.categories.length > 0)?.categories || [];
   const titleOption = buildChartTitleOption(chartNode, seriesArr, ctx, 14);
@@ -846,8 +847,15 @@ function buildLineChartOption(
     .map((x) => x.ser);
   const chartMarkerNode = chartTypeNode.child('marker');
   const chartMarker = chartMarkerNode.exists() ? parseOoxmlBoolElement(chartMarkerNode) : undefined;
+  const seriesColor = (s: SeriesData, idx: number): string | object | undefined =>
+    s.colorHex ?? chartPalette?.[idx % chartPalette.length];
+  const legendColor = (s: SeriesData, idx: number): string | undefined => {
+    const color = seriesColor(s, idx);
+    return typeof color === 'string' ? color : undefined;
+  };
 
   const series: echarts.LineSeriesOption[] = seriesArr.map((s, idx) => {
+    const color = seriesColor(s, idx);
     const markerSymbol =
       s.markerSymbol ??
       (chartMarker === true
@@ -859,7 +867,7 @@ function buildLineChartOption(
     const showSymbol = echartsSymbol !== undefined ? echartsSymbol !== 'none' : undefined;
     const lineWidth = s.lineWidth ?? 3;
     const lineStyle = {
-      ...(s.colorHex ? { color: s.colorHex } : {}),
+      ...(color ? { color } : {}),
       width: lineWidth,
       cap: 'round' as const,
       join: 'round' as const,
@@ -939,8 +947,8 @@ function buildLineChartOption(
       name: s.name,
       data,
       stack: isStacked ? 'total' : undefined,
-      areaStyle: isArea ? { ...(s.colorHex ? { color: s.colorHex } : {}), opacity: 1 } : undefined,
-      itemStyle: s.colorHex ? { color: s.colorHex } : undefined,
+      areaStyle: isArea ? { ...(color ? { color } : {}), opacity: 1 } : undefined,
+      itemStyle: color ? { color } : undefined,
       lineStyle,
       label,
       labelLayout: buildPieLabelLayout(manualLayouts) as echarts.LineSeriesOption['labelLayout'],
@@ -1001,6 +1009,8 @@ function buildLineChartOption(
   const gridBottom = getGridBottomPx(legendInfo);
   const manualGrid = extractManualLayoutGrid(chartNode);
   const containLabel = !hasManualGrid(manualGrid);
+  const legendEntries = seriesArr.map((s, idx) => ({ series: s, idx }));
+  const legendOrder = isStacked || isPercentStacked ? [...legendEntries].reverse() : legendEntries;
   return {
     title: titleOption,
     tooltip: {
@@ -1022,19 +1032,24 @@ function buildLineChartOption(
       legendInfo,
       legendTopPx,
       isArea
-        ? seriesArr.map((s) => s.name)
-        : seriesArr.map((s, idx) => {
+        ? legendOrder.map(({ series, idx }) => {
+            const color = legendColor(series, idx);
+            return color ? { name: series.name, itemStyle: { color } } : series.name;
+          })
+        : legendOrder.map(({ series, idx }) => {
             const markerSymbol =
-              s.markerSymbol ??
+              series.markerSymbol ??
               (chartMarker === true
                 ? defaultLineMarkerSymbol(idx)
                 : chartMarker === false
                   ? 'none'
                   : undefined);
             const marker = mapOoxmlSymbol(markerSymbol);
+            const color = legendColor(series, idx);
+            const style = color ? { lineStyle: { color }, itemStyle: { color } } : {};
             return marker && marker !== 'none'
-              ? { name: s.name, icon: lineLegendIconPath(), marker }
-              : { name: s.name, icon: lineLegendIconPath() };
+              ? { name: series.name, icon: lineLegendIconPath(), marker, ...style }
+              : { name: series.name, icon: lineLegendIconPath(), ...style };
           }),
       legendTextStyle,
     ),
@@ -1975,6 +1990,7 @@ function buildOptionForChartType(
   chartNode: SafeXmlNode,
   seriesArr: SeriesData[],
   ctx: RenderContext,
+  chartPalette?: string[],
   chartSize?: ChartPixelSize,
 ): echarts.EChartsOption | undefined {
   switch (typeName) {
@@ -1983,11 +1999,11 @@ function buildOptionForChartType(
       return buildBarChartOption(chartTypeNode, chartNode, seriesArr, ctx);
     case 'lineChart':
     case 'line3DChart':
-      return buildLineChartOption(chartTypeNode, chartNode, seriesArr, ctx, false);
+      return buildLineChartOption(chartTypeNode, chartNode, seriesArr, ctx, false, chartPalette);
     case 'areaChart':
     case 'area3DChart':
     case 'surface3DChart':
-      return buildLineChartOption(chartTypeNode, chartNode, seriesArr, ctx, true);
+      return buildLineChartOption(chartTypeNode, chartNode, seriesArr, ctx, true, chartPalette);
     case 'pieChart':
     case 'pie3DChart':
       return buildPieChartOption(chartTypeNode, chartNode, seriesArr, false, ctx);
@@ -2232,6 +2248,7 @@ export function parseChartXml(
       chart,
       entry.seriesArr,
       chartCtx,
+      chartPalette,
       chartSize,
     );
     if (!option) continue;
@@ -2245,6 +2262,7 @@ export function parseChartXml(
           chart,
           comboEntry.seriesArr,
           chartCtx,
+          chartPalette,
           chartSize,
         );
         if (!comboOption) continue;

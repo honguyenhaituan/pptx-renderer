@@ -11,6 +11,16 @@ import {
   type LegendInfo,
 } from './types';
 
+export type LegendDataItem =
+  | string
+  | {
+      name: string;
+      icon?: string;
+      marker?: string;
+      itemStyle?: Record<string, unknown>;
+      lineStyle?: Record<string, unknown>;
+    };
+
 export function extractLegendInfo(
   chartNode: SafeXmlNode,
   ctx: RenderContext,
@@ -144,7 +154,7 @@ export function buildLegendOption(
   legendOpt: echarts.EChartsOption['legend'] | undefined,
   legendInfo: LegendInfo | undefined,
   legendTopPx: number | undefined,
-  data: (string | { name: string; icon?: string; marker?: string })[],
+  data: LegendDataItem[],
   textStyle: ChartTextStyle & {
     fontWeight?: 'normal' | 'bold' | 'bolder' | 'lighter' | number;
   },

@@ -163,16 +163,33 @@ export function buildCustomLegendOverlay(
       const name = typeof item === 'string' ? item : item.name;
       const itemIcon = typeof item === 'string' ? undefined : item.icon;
       const itemMarker = typeof item === 'string' ? undefined : item.marker;
+      const itemVisual = typeof item === 'string' ? undefined : (item as Record<string, unknown>);
       if (!name) return null;
-      const series = seriesList[index] as Record<string, unknown> | undefined;
-      const visual = radarData?.[index] ?? series;
-      const lineStyle = (visual?.lineStyle as Record<string, unknown> | undefined) ?? {};
-      const color = pickVisualStringColor(visual, palette[index] ?? '#2f6f8f');
+      const seriesIndex = seriesList.findIndex(
+        (candidate) => (candidate as Record<string, unknown> | undefined)?.name === name,
+      );
+      const radarIndex =
+        radarData?.findIndex((candidate) => (candidate as Record<string, unknown>).name === name) ??
+        -1;
+      const series = (seriesIndex >= 0 ? seriesList[seriesIndex] : seriesList[index]) as
+        | Record<string, unknown>
+        | undefined;
+      const radarVisual =
+        radarData && radarIndex >= 0 ? radarData[radarIndex] : (radarData?.[index] ?? undefined);
+      const visual = radarData ? (radarVisual ?? itemVisual ?? series) : (itemVisual ?? series);
+      const lineSource = radarVisual ?? series;
+      const markerSource = radarVisual ?? series ?? itemVisual;
+      const lineStyle = {
+        ...((lineSource?.lineStyle as Record<string, unknown> | undefined) ?? {}),
+        ...((itemVisual?.lineStyle as Record<string, unknown> | undefined) ?? {}),
+      };
+      const paletteIndex = seriesIndex >= 0 ? seriesIndex : index;
+      const color = pickVisualStringColor(visual, palette[paletteIndex] ?? '#2f6f8f');
       const lineWidth =
         typeof lineStyle.width === 'number' && Number.isFinite(lineStyle.width)
           ? Math.max(1, lineStyle.width)
           : 2;
-      const symbolSize = visual?.symbolSize;
+      const symbolSize = markerSource?.symbolSize;
       const markerSize =
         typeof symbolSize === 'number' && Number.isFinite(symbolSize)
           ? Math.max(3, symbolSize)

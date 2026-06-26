@@ -77,4 +77,45 @@ describe('chart legend overlay helpers', () => {
     expect(svg?.getAttribute('height')).toBe('14');
     expect(markerPath?.getAttribute('d')).toBe('M12 0 L19 7 L12 14 L5 7 Z');
   });
+
+  it('matches legend overlay colors by series name when legend order differs', () => {
+    const overlay = buildCustomLegendOverlay(
+      {
+        color: ['#4472C4', '#ED7D31'],
+        legend: {
+          right: 20,
+          top: 'middle',
+          orient: 'vertical',
+          itemWidth: 24,
+          itemHeight: 9,
+          data: [
+            { name: 'Chat', icon: 'path://M2 4.5 L22 4.5' },
+            { name: 'Email', icon: 'path://M2 4.5 L22 4.5' },
+          ],
+          textStyle: { fontSize: 10, color: '#000000' },
+        },
+        series: [
+          {
+            type: 'line',
+            name: 'Email',
+            lineStyle: { color: '#4472C4', width: 2 },
+            itemStyle: { color: '#4472C4' },
+            data: [120, 132],
+          },
+          {
+            type: 'line',
+            name: 'Chat',
+            lineStyle: { color: '#ED7D31', width: 2 },
+            itemStyle: { color: '#ED7D31' },
+            data: [220, 182],
+          },
+        ],
+      },
+      { w: 800, h: 450 },
+    );
+
+    const icons = overlay?.querySelectorAll('svg path:first-child');
+    expect(icons?.[0].getAttribute('stroke')).toBe('#ED7D31');
+    expect(icons?.[1].getAttribute('stroke')).toBe('#4472C4');
+  });
 });
