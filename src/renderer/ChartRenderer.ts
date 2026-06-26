@@ -6,7 +6,7 @@ import * as echarts from 'echarts';
 import { ChartNodeData } from '../model/nodes/ChartNode';
 import { RenderContext } from './RenderContext';
 import { SafeXmlNode } from '../parser/XmlParser';
-import { hexToRgb, rgbToHex } from '../utils/color';
+import { hexToRgb, hslToRgb, rgbToHex, rgbToHsl } from '../utils/color';
 import { applyAxisInfo, getChartAxisIds, parseAxes, parseScatterAxes } from './chart/axes';
 import { formatValue } from './chart/format';
 import { markerSizeToPx } from './chart/style';
@@ -372,21 +372,34 @@ function forcePercentAxis(axisDef: Record<string, unknown>): void {
   };
 }
 
-function mixHexColor(hex: string, targetHex: string, sourceWeight: number): string {
-  const source = hexToRgb(hex);
-  const target = hexToRgb(targetHex);
-  const targetWeight = 1 - sourceWeight;
-  return rgbToHex(
-    source.r * sourceWeight + target.r * targetWeight,
-    source.g * sourceWeight + target.g * targetWeight,
-    source.b * sourceWeight + target.b * targetWeight,
+function adjustFilledRadarStopColor(
+  hex: string,
+  options: { hueOffset?: number; saturationScale: number; lightnessOffset: number },
+): string {
+  const { r, g, b } = hexToRgb(hex);
+  const { h, s, l } = rgbToHsl(r, g, b);
+  const adjusted = hslToRgb(
+    h + (options.hueOffset ?? 0),
+    Math.min(1, s * options.saturationScale),
+    Math.max(0, Math.min(1, l + options.lightnessOffset)),
   );
+  return rgbToHex(adjusted.r, adjusted.g, adjusted.b);
 }
 
 function buildFilledRadarAreaColor(hex: string): echarts.graphic.LinearGradient {
   return new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-    { offset: 0, color: mixHexColor(hex, '#FFFFFF', 0.55) },
-    { offset: 1, color: mixHexColor(hex, '#000000', 0.92) },
+    {
+      offset: 0,
+      color: adjustFilledRadarStopColor(hex, { saturationScale: 1.95, lightnessOffset: 0.217 }),
+    },
+    {
+      offset: 1,
+      color: adjustFilledRadarStopColor(hex, {
+        hueOffset: -5,
+        saturationScale: 1.7,
+        lightnessOffset: -0.128,
+      }),
+    },
   ]);
 }
 

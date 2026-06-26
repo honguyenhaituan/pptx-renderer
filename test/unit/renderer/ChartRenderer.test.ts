@@ -6632,6 +6632,7 @@ describe('ChartRenderer', () => {
       const areaFill = radarSeries.data[0].areaStyle.color;
       expect(areaFill).toMatchObject({ x: 0, y: 0, x2: 0, y2: 1 });
       expect(areaFill.colorStops.map((stop: any) => stop.offset)).toEqual([0, 1]);
+      expect(areaFill.colorStops.map((stop: any) => stop.color)).toEqual(['#78a8ff', '#0b59bb']);
       expect(radarSeries.data[0].areaStyle.opacity).toBe(0.75);
       expect(radarSeries.data[0].symbol).toBe('none');
     });
