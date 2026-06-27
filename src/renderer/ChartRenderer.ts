@@ -150,14 +150,15 @@ function computePieLayout(
   isDoughnut: boolean,
   showLabel: boolean,
   holeSizePct = 50,
+  hasExplosion = false,
 ): { center: [string, string]; radius: [string, string] | string } {
   const placement = getLegendPlacement(legendInfo);
   let center: [string, string] = ['50%', '55%'];
   let outerRadius = showLabel ? 78 : 82;
 
   if (placement === 'right') {
-    center = ['38%', '55%'];
-    outerRadius = 82;
+    center = isDoughnut && hasExplosion ? ['45%', '55%'] : ['38%', '55%'];
+    outerRadius = isDoughnut && hasExplosion ? 76 : 82;
   } else if (placement === 'left') {
     center = ['62%', '55%'];
     outerRadius = 82;
@@ -1154,7 +1155,10 @@ function buildPieChartOption(
         )),
   );
   const holeSizePct = isDoughnut ? (chartTypeNode.child('holeSize').numAttr('val') ?? 50) : 50;
-  const pieLayout = computePieLayout(legendInfo, isDoughnut, showLabel, holeSizePct);
+  const hasExplosion = seriesLabelMeta.some((meta) =>
+    meta.explosions?.some((explosion) => explosion > 0),
+  );
+  const pieLayout = computePieLayout(legendInfo, isDoughnut, showLabel, holeSizePct, hasExplosion);
   const startAngle = mapFirstSliceAngle(chartTypeNode.child('firstSliceAng').numAttr('val'));
 
   const series: echarts.PieSeriesOption[] = seriesLabelMeta.map((meta, idx) => {

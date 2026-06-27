@@ -7677,6 +7677,35 @@ describe('ChartRenderer', () => {
       expect(series.radius).toBe(radius);
     });
 
+    it('uses a smaller right-legend layout for exploded doughnut charts (oracle-pypptx-chart-0013)', () => {
+      const xml = `
+        <c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+                      xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <c:chart>
+            <c:plotArea>
+              <c:doughnutChart>
+                <c:ser>
+                  <c:idx val="0"/><c:order val="0"/>
+                  <c:tx><c:strRef><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>Values</c:v></c:pt></c:strCache></c:strRef></c:tx>
+                  <c:explosion val="25"/>
+                  <c:cat><c:strRef><c:strCache><c:ptCount val="3"/><c:pt idx="0"><c:v>A</c:v></c:pt><c:pt idx="1"><c:v>B</c:v></c:pt><c:pt idx="2"><c:v>C</c:v></c:pt></c:strCache></c:strRef></c:cat>
+                  <c:val><c:numRef><c:numCache><c:ptCount val="3"/><c:pt idx="0"><c:v>50</c:v></c:pt><c:pt idx="1"><c:v>30</c:v></c:pt><c:pt idx="2"><c:v>20</c:v></c:pt></c:numCache></c:numRef></c:val>
+                </c:ser>
+                <c:holeSize val="50"/>
+              </c:doughnutChart>
+            </c:plotArea>
+            <c:legend><c:legendPos val="r"/><c:layout/><c:overlay val="0"/></c:legend>
+          </c:chart>
+        </c:chartSpace>`;
+
+      const { option } = parseChartOption(xml);
+      const series = (option.series as any[])[0];
+
+      expect(series.center).toEqual(['45%', '55%']);
+      expect(series.radius).toEqual(['38%', '76%']);
+      expect(series.selectedOffset).toBe(25);
+    });
+
     it('merges pie point label overrides with manual layout, box style, and series name', () => {
       const xml = `
         <c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
