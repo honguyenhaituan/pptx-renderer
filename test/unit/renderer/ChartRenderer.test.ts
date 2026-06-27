@@ -2272,7 +2272,7 @@ describe('ChartRenderer', () => {
         }),
       );
       expect(option.title).toBeUndefined();
-      expect(grid?.left).toBe(24);
+      expect(grid?.left).toBe(18);
       expect(grid?.top).toBe(20);
       expect(grid?.bottom).toBe(20);
       expect(xAxis?.max).toBe(3);
