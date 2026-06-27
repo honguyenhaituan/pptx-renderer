@@ -3470,7 +3470,7 @@ describe('ChartRenderer', () => {
       const grid = option.grid as any;
       const series = option.series as any[];
 
-      expect(grid.left).toBe(24);
+      expect(grid.left).toBe(18);
       expect(grid.bottom).toBe(20);
       expect(series[0].barGap).toBe('0%');
     });
@@ -3531,7 +3531,7 @@ describe('ChartRenderer', () => {
       const { option } = parseChartOption(xml);
       const grid = option.grid as any;
 
-      expect(grid.left).toBe(10);
+      expect(grid.left).toBe(15);
       expect(grid.right).toBe(28);
     });
 

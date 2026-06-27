@@ -812,7 +812,7 @@ function buildBarChartOption(
   const gridTop = getGridTopPx(!!titleOption, legendInfo);
   const legendTopPx = getLegendTopPx(!!titleOption, legendInfo);
   // When value axis is hidden, reduce left/right padding so bars use full width
-  const gridLeft = isHorizontal ? 10 : valueAxis.deleted ? 4 : 24;
+  const gridLeft = isHorizontal ? 15 : valueAxis.deleted ? 4 : 18;
   const gridRight = isHorizontal ? 28 : 10;
   const tooltipFmt = pctFormat || sharedSeriesFormat;
   const gridBottom = getGridBottomPx(legendInfo);
@@ -1045,7 +1045,7 @@ function buildLineChartOption(
 
   const gridTop = getGridTopPx(!!titleOption, legendInfo);
   const legendTopPx = getLegendTopPx(!!titleOption, legendInfo);
-  const gridLeft = valueAxis.deleted ? 4 : 24;
+  const gridLeft = valueAxis.deleted ? 4 : 18;
   const tooltipFmt = pctFormat || sharedSeriesFormat;
   const gridBottom = getGridBottomPx(legendInfo);
   const manualGrid = extractManualLayoutGrid(chartNode);
