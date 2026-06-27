@@ -4707,7 +4707,7 @@ describe('ChartRenderer', () => {
       expect(series?.type).toBe('pie');
       // First data point should have selected=true and selectedOffset
       expect(series?.data?.[0]?.selected).toBe(true);
-      expect(series?.data?.[0]?.selectedOffset).toBe(10);
+      expect(series?.data?.[0]?.selectedOffset).toBe(5);
       // selectedMode should allow exploded slices to remain selected together
       expect(series?.selectedMode).toBe('multiple');
     });
@@ -4752,7 +4752,7 @@ describe('ChartRenderer', () => {
       expect(series?.data.every((entry: any) => entry.selectedOffset === 25)).toBe(true);
     });
 
-    it('should preserve series-level explosion on pie charts without capping the offset', () => {
+    it('should map series-level pie explosion to an Office-like selected offset', () => {
       const xml = `<c:chartSpace
         xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
         xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
@@ -4787,7 +4787,7 @@ describe('ChartRenderer', () => {
       expect(series?.selectedMode).toBe('multiple');
       expect(series?.data).toHaveLength(4);
       expect(series?.data.every((entry: any) => entry.selected === true)).toBe(true);
-      expect(series?.data.every((entry: any) => entry.selectedOffset === 25)).toBe(true);
+      expect(series?.data.every((entry: any) => entry.selectedOffset === 13)).toBe(true);
     });
   });
 
@@ -6959,8 +6959,8 @@ describe('ChartRenderer', () => {
       const series = option.series as any[];
 
       expect(series).toHaveLength(2);
-      expect(series[0].radius).toEqual(['41%', '61%']);
-      expect(series[1].radius).toEqual(['62%', '82%']);
+      expect(series[0].radius).toEqual(['44%', '65%']);
+      expect(series[1].radius).toEqual(['66%', '87%']);
       expect((option.legend as any).data).toEqual(['A', 'B', 'C', 'D']);
     });
 
@@ -7706,6 +7706,33 @@ describe('ChartRenderer', () => {
       expect(series.selectedOffset).toBe(25);
     });
 
+    it('uses an Office-like right-legend layout for plain doughnut charts (oracle-pypptx-chart-0012)', () => {
+      const xml = `
+        <c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+                      xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <c:chart>
+            <c:plotArea>
+              <c:doughnutChart>
+                <c:ser>
+                  <c:idx val="0"/><c:order val="0"/>
+                  <c:tx><c:v>Status</c:v></c:tx>
+                  <c:cat><c:strRef><c:strCache><c:ptCount val="3"/><c:pt idx="0"><c:v>Complete</c:v></c:pt><c:pt idx="1"><c:v>In Progress</c:v></c:pt><c:pt idx="2"><c:v>Not Started</c:v></c:pt></c:strCache></c:strRef></c:cat>
+                  <c:val><c:numRef><c:numCache><c:ptCount val="3"/><c:pt idx="0"><c:v>65</c:v></c:pt><c:pt idx="1"><c:v>20</c:v></c:pt><c:pt idx="2"><c:v>15</c:v></c:pt></c:numCache></c:numRef></c:val>
+                </c:ser>
+                <c:holeSize val="50"/>
+              </c:doughnutChart>
+            </c:plotArea>
+            <c:legend><c:legendPos val="r"/><c:layout/><c:overlay val="0"/></c:legend>
+          </c:chart>
+        </c:chartSpace>`;
+
+      const { option } = parseChartOption(xml);
+      const series = (option.series as any[])[0];
+
+      expect(series.center).toEqual(['39%', '54%']);
+      expect(series.radius).toEqual(['44%', '87%']);
+    });
+
     it('merges pie point label overrides with manual layout, box style, and series name', () => {
       const xml = `
         <c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
@@ -7927,9 +7954,9 @@ describe('ChartRenderer', () => {
       const series = (option.series as any[])[0];
 
       expect(series.selectedMode).toBe('multiple');
-      expect(series.selectedOffset).toBe(16);
-      expect(series.data[0]).toMatchObject({ selected: true, selectedOffset: 8 });
-      expect(series.data[1]).toMatchObject({ selected: true, selectedOffset: 16 });
+      expect(series.selectedOffset).toBe(8);
+      expect(series.data[0]).toMatchObject({ selected: true, selectedOffset: 4 });
+      expect(series.data[1]).toMatchObject({ selected: true, selectedOffset: 8 });
     });
 
     it('keeps smooth scatter line data finite for short and non-monotonic x values', () => {

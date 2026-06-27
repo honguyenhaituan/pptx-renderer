@@ -157,8 +157,16 @@ function computePieLayout(
   let outerRadius = showLabel ? 78 : 82;
 
   if (placement === 'right') {
-    center = isDoughnut && hasExplosion ? ['45%', '55%'] : ['38%', '55%'];
-    outerRadius = isDoughnut && hasExplosion ? 76 : 82;
+    if (isDoughnut && hasExplosion) {
+      center = ['45%', '55%'];
+      outerRadius = 76;
+    } else if (isDoughnut) {
+      center = ['39%', '54%'];
+      outerRadius = 87;
+    } else {
+      center = ['38%', '55%'];
+      outerRadius = 82;
+    }
   } else if (placement === 'left') {
     center = ['62%', '55%'];
     outerRadius = 82;
@@ -177,8 +185,8 @@ function computePieLayout(
   return { center, radius: [`${innerRadius}%`, `${outerRadius}%`] };
 }
 
-function pieExplosionToOffset(explosion: number): number {
-  return explosion;
+function pieExplosionToOffset(explosion: number, isDoughnut = false): number {
+  return isDoughnut ? explosion : Math.round(explosion * 0.5);
 }
 
 function mapFirstSliceAngle(firstSliceAng: number | undefined): number | undefined {
@@ -1186,7 +1194,7 @@ function buildPieChartOption(
       }
       if (meta.explosions?.[i] && meta.explosions[i] > 0) {
         item.selected = true;
-        item.selectedOffset = pieExplosionToOffset(meta.explosions[i]);
+        item.selectedOffset = pieExplosionToOffset(meta.explosions[i], isDoughnut);
       }
       if (override?.deleted) {
         item.label = { show: false };
@@ -1201,7 +1209,8 @@ function buildPieChartOption(
       Boolean(meta.sharedLabels?.showLeaderLines) ||
       [...meta.pointOverrides.values()].some((cfg) => cfg.showLeaderLines === true);
     const selectedOffset =
-      meta.explosions && Math.max(...meta.explosions.map((exp) => pieExplosionToOffset(exp)));
+      meta.explosions &&
+      Math.max(...meta.explosions.map((exp) => pieExplosionToOffset(exp, isDoughnut)));
 
     return {
       type: 'pie' as const,
