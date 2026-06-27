@@ -984,6 +984,8 @@ function buildLineChartOption(
       : isArea && echartsSymbol === undefined
         ? false
         : showSymbol;
+    const showAllSymbol =
+      resolvedShowSymbol === true && symbol !== undefined && symbol !== 'none' && symbolSize !== 0;
     return {
       type: 'line' as const,
       name: s.name,
@@ -1008,6 +1010,7 @@ function buildLineChartOption(
       ...(symbol ? { symbol } : {}),
       ...(symbolSize !== undefined ? { symbolSize } : {}),
       ...(resolvedShowSymbol !== undefined ? { showSymbol: resolvedShowSymbol } : {}),
+      ...(showAllSymbol ? { showAllSymbol: true } : {}),
       z: 3,
     };
   });

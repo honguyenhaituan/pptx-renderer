@@ -6313,6 +6313,7 @@ describe('ChartRenderer', () => {
       const { option } = parseChartOption(xml);
       const series = option.series as any[];
       expect(series.map((s) => s.showSymbol)).toEqual([true, true, true]);
+      expect(series.map((s) => s.showAllSymbol)).toEqual([true, true, true]);
       expect(series.map((s) => s.symbol)).toEqual(['diamond', 'rect', 'triangle']);
       expect(series.map((s) => s.symbolSize)).toEqual([12, 12, 12]);
     });
