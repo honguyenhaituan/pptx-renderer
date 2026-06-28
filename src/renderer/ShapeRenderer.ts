@@ -1233,15 +1233,7 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
   wrapper.style.width = `${node.size.w}px`;
   // Line-like: preset line/connector, or cxnSp (connection shape), or flat extent (one dimension 0)
   const presetKey = node.presetGeometry?.toLowerCase() ?? '';
-  const outlineOnlyPresets = new Set([
-    'arc',
-    'leftbracket',
-    'rightbracket',
-    'leftbrace',
-    'rightbrace',
-    'bracketpair',
-    'bracepair',
-  ]);
+  const outlineOnlyPresets = new Set(['arc']);
   const presetIsLine =
     !!presetKey &&
     (presetKey === 'line' ||
@@ -1365,7 +1357,7 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
     }
   }
   // fillRef fallback: when no explicit fill but fillRef idx > 0, use fillRef color
-  if (!fillCss && fillRef && fillRef.exists()) {
+  if (!fillCss && fillRef && fillRef.exists() && (fillRef.numAttr('idx') ?? 0) > 0) {
     const resolvedThemeFill = resolveThemeFillReference(fillRef, ctx);
     fillCss = resolvedThemeFill.fillCss;
     if (!gradientFillData) gradientFillData = resolvedThemeFill.gradientFillData;

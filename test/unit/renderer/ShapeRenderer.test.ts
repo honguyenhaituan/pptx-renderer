@@ -509,6 +509,63 @@ describe('ShapeRenderer', () => {
     expect(path?.getAttribute('stroke')).toBe('none');
   });
 
+  it.each(['leftBracket', 'rightBracket', 'leftBrace', 'rightBrace', 'bracketPair', 'bracePair'])(
+    'renders %s as a fillable preset shape, not a stroke-only connector',
+    (preset) => {
+      const xml = `
+        <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+              xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <p:nvSpPr>
+            <p:cNvPr id="31" name="${preset}"/>
+            <p:cNvSpPr/>
+            <p:nvPr/>
+          </p:nvSpPr>
+          <p:spPr>
+            <a:xfrm>
+              <a:off x="0" y="0"/>
+              <a:ext cx="3657600" cy="2560320"/>
+            </a:xfrm>
+            <a:prstGeom prst="${preset}"><a:avLst/></a:prstGeom>
+            <a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+            <a:ln w="12700"><a:solidFill><a:srgbClr val="2F5597"/></a:solidFill></a:ln>
+          </p:spPr>
+        </p:sp>
+      `;
+
+      const el = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+      const path = el.querySelector('path');
+
+      expect(path?.getAttribute('fill')).toBe('#4472C4');
+      expect(path?.getAttribute('stroke')).toBe('#2F5597');
+    },
+  );
+
+  it('does not fill bracket or brace presets from a style fillRef idx of 0', () => {
+    const xml = `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr>
+          <p:cNvPr id="31" name="Left Brace"/>
+          <p:cNvSpPr/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="3657600" cy="2560320"/></a:xfrm>
+          <a:prstGeom prst="leftBrace"><a:avLst/></a:prstGeom>
+        </p:spPr>
+        <p:style>
+          <a:lnRef idx="2"><a:schemeClr val="accent1"/></a:lnRef>
+          <a:fillRef idx="0"><a:schemeClr val="accent1"/></a:fillRef>
+        </p:style>
+      </p:sp>
+    `;
+
+    const el = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+    const path = el.querySelector('path');
+
+    expect(path?.getAttribute('fill')).toBe('none');
+  });
+
   it('renders fillRef theme gradient using phClr from fillRef color (windows pypptx shape adj)', () => {
     const xml = `
       <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
