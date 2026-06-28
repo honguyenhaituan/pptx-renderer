@@ -49,4 +49,19 @@ describe('chart option post-process helpers', () => {
     expect(option.yAxis.max).toBe(5);
     expect(option.yAxis.interval).toBe(5);
   });
+
+  it('keeps Office-like dense value-axis ticks for compact line charts', () => {
+    const option = {
+      grid: { top: 64, bottom: 24 },
+      xAxis: { type: 'category' },
+      yAxis: { type: 'value', axisLabel: { fontSize: 24 } },
+      series: [{ type: 'line', data: [120, 135, 148] }],
+    };
+
+    applyNiceAxisRange(option, { w: 528, h: 576 });
+
+    expect(option.yAxis.min).toBe(0);
+    expect(option.yAxis.max).toBe(160);
+    expect(option.yAxis.interval).toBe(20);
+  });
 });

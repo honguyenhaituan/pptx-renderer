@@ -266,13 +266,14 @@ function densityLimitedDesiredTicks(
   axisDimension: 'x' | 'y',
   chartSize: ChartPixelSize | undefined,
   grid: unknown,
+  labelSpacingFactor = 2.6,
 ): number {
   const plotSpan = gridPlotSpanPx(grid, chartSize, axisDimension);
   if (plotSpan === undefined || plotSpan <= 0) return desiredTicks;
 
   const axisLabel = axis.axisLabel ?? {};
   const fontSize = typeof axisLabel.fontSize === 'number' ? axisLabel.fontSize : 12;
-  const minLabelSpacing = Math.max(28, fontSize * 2.6);
+  const minLabelSpacing = Math.max(28, fontSize * labelSpacingFactor);
   const maxLabels = Math.max(2, Math.floor(plotSpan / minLabelSpacing) + 1);
   return Math.max(1, Math.min(desiredTicks, maxLabels - 1));
 }
@@ -349,7 +350,9 @@ export function applyNiceAxisRange(
 
   const hasBarSeries = seriesArr.some((s: { type?: string }) => s.type === 'bar');
   const hasNonBarSeries = seriesArr.some((s: { type?: string }) => s.type && s.type !== 'bar');
-  const defaultDesiredTicks = hasBarSeries && !hasNonBarSeries ? 10 : 8;
+  const isPureBarChart = hasBarSeries && !hasNonBarSeries;
+  const defaultDesiredTicks = isPureBarChart ? 10 : 8;
+  const labelSpacingFactor = isPureBarChart ? 2.6 : 2.0;
 
   if (allValues.length === 0) return;
 
@@ -422,6 +425,7 @@ export function applyNiceAxisRange(
         axisDimension,
         chartSize,
         opt.grid,
+        labelSpacingFactor,
       );
       const interval = niceAxisInterval(dataMax, dataMin, desiredTicks);
 
