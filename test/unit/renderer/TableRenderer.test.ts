@@ -97,6 +97,30 @@ describe('renderTable', () => {
     expect(el.style.height).toBe('200px');
   });
 
+  it('sizes the wrapper to the column/row grid, not a stale graphicFrame ext', () => {
+    // Some producers (e.g. Google Slides exports) leave a placeholder graphicFrame
+    // <a:ext> that does not match the table grid. PowerPoint sizes a table from
+    // Σ column widths × Σ row heights; honoring the stale ext would squish every
+    // column and clip cell text.
+    const rows: TableRow[] = [
+      { height: 150, cells: [{ gridSpan: 1, rowSpan: 1, hMerge: false, vMerge: false }] },
+      { height: 250, cells: [{ gridSpan: 1, rowSpan: 1, hMerge: false, vMerge: false }] },
+    ];
+    const node = makeTable({ columns: [200, 400], rows });
+    node.size = { w: 315, h: 315 }; // stale ext, smaller than the 600 x 400 grid
+    const el = renderTable(node, makeCtx());
+    expect(el.style.width).toBe('600px');
+    expect(el.style.height).toBe('400px');
+  });
+
+  it('falls back to the frame size when the grid has no explicit widths/heights', () => {
+    const node = makeTable({ columns: [], rows: [] });
+    node.size = { w: 320, h: 240 };
+    const el = renderTable(node, makeCtx());
+    expect(el.style.width).toBe('320px');
+    expect(el.style.height).toBe('240px');
+  });
+
   it('creates inner table element with border-collapse', () => {
     const el = renderTable(makeTable(), makeCtx());
     const table = el.querySelector('table')!;

@@ -1284,14 +1284,47 @@ describe('renderGroup — child coordinate remapping', () => {
     expect(capturedNode.size.h).toBeCloseTo(500);
   });
 
-  it('skips coordinate remapping when childExtent is 0 in either dimension', () => {
+  it('skips coordinate remapping when childExtent is 0 in both dimensions', () => {
     const group = makeGroup([makeSpXml()], {
       childExtentW: 0,
       childExtentH: 0,
     });
-    // When chExt is zero the remapping block is skipped — no crash expected
+    // A fully degenerate child space has no usable mapping — the remap block is
+    // skipped and children keep their raw coordinates. No crash expected.
     const el = renderGroup(group, createMockRenderContext(), stubRenderNode);
     expect(el.children.length).toBe(1);
+  });
+
+  it('remaps children along the non-degenerate axis when a group is flat (childExtent.h = 0)', () => {
+    // Regression: layout divider/underline lines live in a zero-height group
+    // (ext.cy = chExt.cy = 0). The child-space → group-space remap must still
+    // subtract childOffset and scale the non-degenerate (X) axis; skipping the
+    // whole block left the line displaced by (chOffX, chOffY).
+    const group = makeGroup([makeSpXml()], {
+      x: 0,
+      y: 0,
+      w: 400,
+      h: 0,
+      childOffsetX: 50,
+      childOffsetY: 25,
+      childExtentW: 200,
+      childExtentH: 0, // flat group: no vertical child extent (a horizontal line)
+    });
+
+    let capturedNode: any;
+    const capture = (childNode: any, ctx: RenderContext): HTMLElement => {
+      capturedNode = childNode;
+      return stubRenderNode(childNode, ctx);
+    };
+
+    renderGroup(group, createMockRenderContext(), capture);
+
+    // X axis: scale = groupW / chExtW = 400 / 200 = 2, position = (0 - 50) * 2 = -100
+    expect(capturedNode.position.x).toBeCloseTo(-100);
+    expect(capturedNode.size.w).toBeCloseTo(192); // 96px child * 2
+    // Y axis is degenerate (chExtH = 0): scale falls back to 1 (no NaN), still subtract chOffY
+    expect(capturedNode.position.y).toBeCloseTo(-25); // (0 - 25) * 1
+    expect(Number.isNaN(capturedNode.size.h)).toBe(false);
   });
 });
 
