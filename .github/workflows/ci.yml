@@ -24,7 +24,7 @@ jobs:
           node-version: 20
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm lint
       - run: pnpm format:check
 
@@ -41,7 +41,7 @@ jobs:
           node-version: 20
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm typecheck
 
   test:
@@ -57,7 +57,7 @@ jobs:
           node-version: 20
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm test:coverage
 
       - uses: codecov/codecov-action@v4
@@ -86,7 +86,7 @@ jobs:
           node-version: 20
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm test:pdfjs-contract
       - run: pnpm build
       - run: pnpm test:package
@@ -108,8 +108,8 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm add --save-dev pdfjs-dist@^6
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm add --save-dev pdfjs-dist@^6 --ignore-scripts
       - run: pnpm test:pdfjs-contract
       - run: pnpm build
       - run: pnpm test:package
