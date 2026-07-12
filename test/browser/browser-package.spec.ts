@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
+import JSZip from 'jszip';
 
 const require = createRequire(import.meta.url);
 
@@ -65,6 +67,58 @@ test('standalone browser entry renders a tracked PPTX including its chart', asyn
   expect(result.canvasCount).toBeGreaterThan(0);
   expect(result.width).toBeGreaterThan(0);
   expect(result.textLength).toBeGreaterThan(0);
+});
+
+test('standalone browser entry honors firstSlideNum with empty cached fields', async ({ page }) => {
+  const zip = await JSZip.loadAsync(
+    await readFile(resolve('docs/example/1-chart-and-complex/source.pptx')),
+  );
+  const presentationPath = 'ppt/presentation.xml';
+  const presentationXml = await zip.file(presentationPath)!.async('string');
+  zip.file(
+    presentationPath,
+    presentationXml.replace('<p:presentation ', '<p:presentation firstSlideNum="10" '),
+  );
+  for (const slidePath of ['ppt/slides/slide1.xml', 'ppt/slides/slide2.xml']) {
+    const slideXml = await zip.file(slidePath)!.async('string');
+    zip.file(
+      slidePath,
+      slideXml.replace(/(<a:fld\b[^>]*type="slidenum"[\s\S]*?<a:t>)[\s\S]*?(<\/a:t>)/g, '$1$2'),
+    );
+  }
+
+  await page.goto('/test/browser/blank.html');
+  const slideNumbers = await page.evaluate(
+    async (bytes) => {
+      const renderer = await import('/dist/aiden0z-pptx-renderer.browser.es.js');
+      const presentation = renderer.buildPresentation(
+        await renderer.parseZip(new Uint8Array(bytes).buffer),
+      );
+
+      return presentation.slides.map((slide) => {
+        const fieldNode = slide.nodes.find(
+          (node) =>
+            node.nodeType === 'shape' &&
+            node.textBody?.paragraphs.some((paragraph) =>
+              paragraph.runs.some((run) => run.fieldType === 'slidenum'),
+            ),
+        );
+        if (!fieldNode) return null;
+
+        const handle = renderer.renderSlide(presentation, {
+          ...slide,
+          nodes: [fieldNode],
+          showMasterSp: false,
+        });
+        const text = handle.element.textContent?.trim() ?? null;
+        handle.dispose();
+        return text;
+      });
+    },
+    [...(await zip.generateAsync({ type: 'uint8array' }))],
+  );
+
+  expect(slideNumbers).toEqual(['10', '11']);
 });
 
 test('host image resets do not change PPTX picture sizing or crops', async ({ page }) => {

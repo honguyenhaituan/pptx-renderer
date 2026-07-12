@@ -1037,17 +1037,49 @@ describe('TextRenderer — renderTextBody', () => {
       }
     });
 
-    it('renders slide number fields from the current slide index', () => {
+    it('renders slide number fields with the default starting number', () => {
       const ctx = createMockRenderContext();
       ctx.slide.index = 19;
       const container = document.createElement('div');
       renderTextBody(
-        makeTextBody({ paragraphs: [{ runs: [{ text: '‹#›', fieldType: 'slidenum' }], level: 0 }] }),
+        makeTextBody({
+          paragraphs: [{ runs: [{ text: '‹#›', fieldType: 'slidenum' }], level: 0 }],
+        }),
         undefined,
         ctx,
         container,
       );
       expect(container.textContent).toBe('20');
+    });
+
+    it('renders slide number fields with a non-default starting number', () => {
+      const ctx = createMockRenderContext();
+      ctx.presentation.firstSlideNum = 10;
+      ctx.slide.index = 1;
+      const container = document.createElement('div');
+      renderTextBody(
+        makeTextBody({ paragraphs: [{ runs: [{ text: '2', fieldType: 'slidenum' }], level: 0 }] }),
+        undefined,
+        ctx,
+        container,
+      );
+      expect(container.textContent).toBe('11');
+    });
+
+    it('treats slide number fields with empty cached text as visible', () => {
+      const ctx = createMockRenderContext();
+      ctx.presentation.firstSlideNum = 10;
+      ctx.slide.index = 1;
+      const container = document.createElement('div');
+      renderTextBody(
+        makeTextBody({ paragraphs: [{ runs: [{ text: '', fieldType: 'slidenum' }], level: 0 }] }),
+        undefined,
+        ctx,
+        container,
+      );
+
+      expect(container.textContent).toBe('11');
+      expect(container.querySelector('br')).toBeNull();
     });
   });
 

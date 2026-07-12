@@ -814,13 +814,30 @@ interface RenderTextBodyOptions {
   compactSingleLineSpacing?: boolean;
 }
 
+export function resolveTextFields(textBody: TextBody, ctx: RenderContext): TextBody {
+  let changed = false;
+  const slideNumber = String((ctx.presentation.firstSlideNum ?? 1) + ctx.slide.index);
+  const paragraphs = textBody.paragraphs.map((paragraph) => {
+    let paragraphChanged = false;
+    const runs = paragraph.runs.map((run) => {
+      if (run.fieldType?.toLowerCase() !== 'slidenum') return run;
+      changed = true;
+      paragraphChanged = true;
+      return { ...run, text: slideNumber };
+    });
+    return paragraphChanged ? { ...paragraph, runs } : paragraph;
+  });
+  return changed ? { ...textBody, paragraphs } : textBody;
+}
+
 export function renderTextBody(
-  textBody: TextBody,
+  sourceTextBody: TextBody,
   placeholder: PlaceholderInfo | undefined,
   ctx: RenderContext,
   container: HTMLElement,
   options?: RenderTextBodyOptions,
 ): void {
+  const textBody = resolveTextFields(sourceTextBody, ctx);
   const category = getPlaceholderCategory(placeholder);
 
   // Parse normAutofit from bodyPr (font scaling + line spacing reduction)
@@ -1114,11 +1131,7 @@ export function renderTextBody(
       paraDiv.appendChild(currentLineDiv);
     }
 
-    for (const [runIndex, sourceRun] of paragraph.runs.entries()) {
-      const run =
-        sourceRun.fieldType?.toLowerCase() === 'slidenum'
-          ? { ...sourceRun, text: String(ctx.slide.index + 1) }
-          : sourceRun;
+    for (const [runIndex, run] of paragraph.runs.entries()) {
       if (run.text === '\n') {
         if (useLineWrappers) {
           // Close current line div and start a new one
