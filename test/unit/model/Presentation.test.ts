@@ -133,6 +133,20 @@ describe('buildPresentation', () => {
     expect(pres.height).toBeCloseTo(720, 0);
   });
 
+  it('defaults the first slide number to 1', () => {
+    expect(buildPresentation(makeMinimalFiles()).firstSlideNum).toBe(1);
+  });
+
+  it('parses a non-default first slide number', () => {
+    const files = makeMinimalFiles();
+    files.presentation = files.presentation.replace(
+      '<Presentation ',
+      '<Presentation firstSlideNum="10" ',
+    );
+
+    expect(buildPresentation(files).firstSlideNum).toBe(10);
+  });
+
   it('parses presentation-level default text style', () => {
     const pres = buildPresentation(
       makeMinimalFiles({

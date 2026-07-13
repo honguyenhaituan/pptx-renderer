@@ -1030,13 +1030,56 @@ describe('TextRenderer — renderTextBody', () => {
       expect(container.textContent).toContain('Line 2');
     });
 
-    it('renders empty paragraph with <br>', () => {
-      const body = makeTextBody({
-        paragraphs: [{ runs: [], level: 0 }],
-      });
-      const container = renderToContainer(body);
-      const br = container.querySelector('br');
-      expect(br).not.toBeNull();
+    it('renders empty paragraphs with <br>, including explicit empty runs', () => {
+      for (const runs of [[], [{ text: '' }]]) {
+        const body = makeTextBody({ paragraphs: [{ runs, level: 0 }] });
+        expect(renderToContainer(body).querySelector('br')).not.toBeNull();
+      }
+    });
+
+    it('renders slide number fields with the default starting number', () => {
+      const ctx = createMockRenderContext();
+      ctx.slide.index = 19;
+      const container = document.createElement('div');
+      renderTextBody(
+        makeTextBody({
+          paragraphs: [{ runs: [{ text: '‹#›', fieldType: 'slidenum' }], level: 0 }],
+        }),
+        undefined,
+        ctx,
+        container,
+      );
+      expect(container.textContent).toBe('20');
+    });
+
+    it('renders slide number fields with a non-default starting number', () => {
+      const ctx = createMockRenderContext();
+      ctx.presentation.firstSlideNum = 10;
+      ctx.slide.index = 1;
+      const container = document.createElement('div');
+      renderTextBody(
+        makeTextBody({ paragraphs: [{ runs: [{ text: '2', fieldType: 'slidenum' }], level: 0 }] }),
+        undefined,
+        ctx,
+        container,
+      );
+      expect(container.textContent).toBe('11');
+    });
+
+    it('treats slide number fields with empty cached text as visible', () => {
+      const ctx = createMockRenderContext();
+      ctx.presentation.firstSlideNum = 10;
+      ctx.slide.index = 1;
+      const container = document.createElement('div');
+      renderTextBody(
+        makeTextBody({ paragraphs: [{ runs: [{ text: '', fieldType: 'slidenum' }], level: 0 }] }),
+        undefined,
+        ctx,
+        container,
+      );
+
+      expect(container.textContent).toBe('11');
+      expect(container.querySelector('br')).toBeNull();
     });
   });
 
