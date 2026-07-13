@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
+import JSZip from 'jszip';
 
 const require = createRequire(import.meta.url);
 
@@ -65,6 +67,106 @@ test('standalone browser entry renders a tracked PPTX including its chart', asyn
   expect(result.canvasCount).toBeGreaterThan(0);
   expect(result.width).toBeGreaterThan(0);
   expect(result.textLength).toBeGreaterThan(0);
+});
+
+test('standalone browser entry honors firstSlideNum with empty cached fields', async ({ page }) => {
+  const zip = await JSZip.loadAsync(
+    await readFile(resolve('docs/example/1-chart-and-complex/source.pptx')),
+  );
+  const presentationPath = 'ppt/presentation.xml';
+  const presentationXml = await zip.file(presentationPath)!.async('string');
+  zip.file(
+    presentationPath,
+    presentationXml.replace('<p:presentation ', '<p:presentation firstSlideNum="10" '),
+  );
+  for (const slidePath of ['ppt/slides/slide1.xml', 'ppt/slides/slide2.xml']) {
+    const slideXml = await zip.file(slidePath)!.async('string');
+    zip.file(
+      slidePath,
+      slideXml.replace(/(<a:fld\b[^>]*type="slidenum"[\s\S]*?<a:t>)[\s\S]*?(<\/a:t>)/g, '$1$2'),
+    );
+  }
+
+  await page.goto('/test/browser/blank.html');
+  const slideNumbers = await page.evaluate(
+    async (bytes) => {
+      const renderer = await import('/dist/aiden0z-pptx-renderer.browser.es.js');
+      const presentation = renderer.buildPresentation(
+        await renderer.parseZip(new Uint8Array(bytes).buffer),
+      );
+
+      return presentation.slides.map((slide) => {
+        const fieldNode = slide.nodes.find(
+          (node) =>
+            node.nodeType === 'shape' &&
+            node.textBody?.paragraphs.some((paragraph) =>
+              paragraph.runs.some((run) => run.fieldType === 'slidenum'),
+            ),
+        );
+        if (!fieldNode) return null;
+
+        const handle = renderer.renderSlide(presentation, {
+          ...slide,
+          nodes: [fieldNode],
+          showMasterSp: false,
+        });
+        const text = handle.element.textContent?.trim() ?? null;
+        handle.dispose();
+        return text;
+      });
+    },
+    [...(await zip.generateAsync({ type: 'uint8array' }))],
+  );
+
+  expect(slideNumbers).toEqual(['10', '11']);
+});
+
+test('tracked PPTX renders stale table frames from the table grid dimensions', async ({ page }) => {
+  await page.goto('/test/browser/blank.html');
+  const result = await page.evaluate(async () => {
+    const renderer = await import('/dist/aiden0z-pptx-renderer.browser.es.js');
+    const response = await fetch('/docs/example/table-stale-frame/source.pptx');
+    const presentation = renderer.buildPresentation(
+      await renderer.parseZip(await response.arrayBuffer()),
+    );
+    const tableNode = presentation.slides[0].nodes.find((node) => node.nodeType === 'table');
+    if (!tableNode || tableNode.nodeType !== 'table') throw new Error('Missing table node');
+    const serializedTable = renderer
+      .serializePresentation(presentation)
+      .slides[0].nodes.find((node) => node.nodeType === 'table');
+    const indexedCell = renderer
+      .buildTextIndex(presentation)
+      .find((entry) => entry.nodeType === 'table');
+    const handle = renderer.renderSlide(presentation, presentation.slides[0]);
+    document.body.replaceChildren(handle.element);
+    await handle.ready;
+
+    const table = handle.element.querySelector('table');
+    const wrapper = table?.parentElement;
+    const firstCell = table?.querySelector('td');
+    if (!wrapper || !firstCell) throw new Error('Missing rendered table DOM');
+
+    const rawExtent = tableNode.source.child('xfrm').child('ext');
+    return {
+      rawFrame: [rawExtent.numAttr('cx'), rawExtent.numAttr('cy')],
+      modelSize: [tableNode.size.w, tableNode.size.h],
+      serializedSize: [serializedTable?.size.w, serializedTable?.size.h],
+      indexedSize: [indexedCell?.bounds.w, indexedCell?.bounds.h],
+      domSize: [wrapper.getBoundingClientRect().width, wrapper.getBoundingClientRect().height],
+      firstCellWidth: firstCell.getBoundingClientRect().width,
+      text: wrapper.textContent,
+    };
+  });
+
+  expect(result.rawFrame).toEqual([914400, 914400]);
+  expect(result.modelSize[0]).toBeCloseTo(576, 0);
+  expect(result.modelSize[1]).toBeCloseTo(192, 0);
+  expect(result.serializedSize).toEqual(result.modelSize);
+  expect(result.indexedSize).toEqual(result.modelSize);
+  expect(result.domSize[0]).toBeCloseTo(576, 0);
+  expect(result.domSize[1]).toBeCloseTo(192, 0);
+  expect(result.firstCellWidth).toBeGreaterThan(250);
+  expect(result.text).toContain('Wide table cell remains visible');
 });
 
 test('host image resets do not change PPTX picture sizing or crops', async ({ page }) => {

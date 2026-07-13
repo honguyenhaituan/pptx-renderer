@@ -18,6 +18,8 @@ import type { GroupNodeData } from './nodes/GroupNode';
 export interface PresentationData {
   width: number;
   height: number;
+  /** Presentation slide-number offset. Library-built models always set this; older manual models may omit it. */
+  firstSlideNum?: number;
   slides: SlideData[];
   layouts: Map<string, LayoutData>;
   masters: Map<string, MasterData>;
@@ -192,6 +194,7 @@ export function buildPresentation(
   const sldSz = presRoot.child('sldSz');
   const width = emuToPx(sldSz.numAttr('cx') ?? 9144000); // default 10 inches
   const height = emuToPx(sldSz.numAttr('cy') ?? 6858000); // default 7.5 inches
+  const firstSlideNum = presRoot.numAttr('firstSlideNum') ?? 1;
 
   // --- WPS detection ---
   const isWps = detectWps(files.presentation);
@@ -382,6 +385,7 @@ export function buildPresentation(
   const result: PresentationData = {
     width,
     height,
+    firstSlideNum,
     slides,
     layouts,
     masters,

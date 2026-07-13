@@ -12,6 +12,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Added browser rendering for licensed EOT/MTX fonts embedded in PowerPoint files, with
   bounded face, byte, and processing budgets plus host-font fallback for rejected faces.
 
+### Fixed
+
+- Sized tables from their column/row grid (Σ column widths × Σ row heights) instead of the
+  graphicFrame `<a:ext>`, so tables authored in Google Slides — which export a stale
+  placeholder ext — no longer render squished with clipped cell text.
+- Fixed group child coordinate remapping for flat groups whose child extent is zero on one
+  axis (e.g. a divider/underline built from horizontal connectors). The populated axis is now
+  offset and scaled correctly instead of skipping the remap, which had left the children
+  displaced by the group's child offset.
+
 ## [1.2.4] - 2026-07-10
 
 ### Added

@@ -814,13 +814,30 @@ interface RenderTextBodyOptions {
   compactSingleLineSpacing?: boolean;
 }
 
+export function resolveTextFields(textBody: TextBody, ctx: RenderContext): TextBody {
+  let changed = false;
+  const slideNumber = String((ctx.presentation.firstSlideNum ?? 1) + ctx.slide.index);
+  const paragraphs = textBody.paragraphs.map((paragraph) => {
+    let paragraphChanged = false;
+    const runs = paragraph.runs.map((run) => {
+      if (run.fieldType?.toLowerCase() !== 'slidenum') return run;
+      changed = true;
+      paragraphChanged = true;
+      return { ...run, text: slideNumber };
+    });
+    return paragraphChanged ? { ...paragraph, runs } : paragraph;
+  });
+  return changed ? { ...textBody, paragraphs } : textBody;
+}
+
 export function renderTextBody(
-  textBody: TextBody,
+  sourceTextBody: TextBody,
   placeholder: PlaceholderInfo | undefined,
   ctx: RenderContext,
   container: HTMLElement,
   options?: RenderTextBodyOptions,
 ): void {
+  const textBody = resolveTextFields(sourceTextBody, ctx);
   const category = getPlaceholderCategory(placeholder);
 
   // Parse normAutofit from bodyPr (font scaling + line spacing reduction)
@@ -1092,7 +1109,7 @@ export function renderTextBody(
     // ---- Render runs ----
     const compactNumericRunGroups = findCompactNumericRunGroups(paragraph.runs);
     const compactNumericGroupElements = new Map<number, HTMLElement>();
-    if (paragraph.runs.length === 0) {
+    if (!hasVisibleRuns) {
       // Empty paragraph — still need to maintain spacing
       paraDiv.appendChild(document.createElement('br'));
     }

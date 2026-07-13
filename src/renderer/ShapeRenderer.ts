@@ -110,7 +110,7 @@ import {
   resolveThemeFillReference,
   getFocusedGradientStops,
 } from './StyleResolver';
-import { renderTextBody } from './TextRenderer';
+import { renderTextBody, resolveTextFields } from './TextRenderer';
 import { renderCustomGeometry } from '../shapes/customGeometry';
 import {
   getPresetShapePath,
@@ -2420,8 +2420,12 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
   }
 
   // ---- Render text overlay (only when there is visible text; skip for decorative shapes with empty txBody) ----
-  if (node.textBody && node.textBody.paragraphs.length > 0 && hasVisibleText(node.textBody)) {
-    const warpedText = renderWarpedTextBody(node, ctx);
+  const textBody = node.textBody ? resolveTextFields(node.textBody, ctx) : undefined;
+  if (textBody && textBody.paragraphs.length > 0 && hasVisibleText(textBody)) {
+    const warpedText = renderWarpedTextBody(
+      textBody === node.textBody ? node : { ...node, textBody },
+      ctx,
+    );
     if (warpedText) {
       wrapper.appendChild(warpedText);
     } else {
@@ -2446,14 +2450,14 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
       // - normAutofit: text shrinks to fit shape → apply fontScale, overflow hidden
       // - noAutofit: text clips → overflow hidden
       // - (default, no child): PowerPoint implicitly auto-shrinks simple single-line labels
-      const spAutoFit = getEffectiveBodyPrChild(node.textBody, 'spAutoFit');
+      const spAutoFit = getEffectiveBodyPrChild(textBody, 'spAutoFit');
       const hasSpAutoFit = spAutoFit?.exists();
-      const normAutofit = getEffectiveBodyPrChild(node.textBody, 'normAutofit');
+      const normAutofit = getEffectiveBodyPrChild(textBody, 'normAutofit');
       const hasNormAutofit = normAutofit?.exists();
-      const noAutofit = getEffectiveBodyPrChild(node.textBody, 'noAutofit');
+      const noAutofit = getEffectiveBodyPrChild(textBody, 'noAutofit');
       const hasNoAutofit = noAutofit?.exists();
-      const bodyPr = node.textBody.bodyProperties;
-      const fallbackBp = node.textBody.layoutBodyProperties;
+      const bodyPr = textBody.bodyProperties;
+      const fallbackBp = textBody.layoutBodyProperties;
       const textWrap =
         (bodyPr ? bodyPr.attr('wrap') : undefined) ??
         (fallbackBp ? fallbackBp.attr('wrap') : undefined);
@@ -2471,12 +2475,12 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
         !hasSpAutoFit &&
         !hasNormAutofit &&
         !hasNoAutofit &&
-        isSingleLineTextBody(node.textBody) &&
-        !hasBulletParagraph(node.textBody) &&
+        isSingleLineTextBody(textBody) &&
+        !hasBulletParagraph(textBody) &&
         (textWrap === 'none' ||
-          (textWrap === undefined && isShortImplicitSingleLineLabel(node.textBody)));
+          (textWrap === undefined && isShortImplicitSingleLineLabel(textBody)));
       const usesNoAutofitSingleLineTitleFit =
-        hasNoAutofit && isTitlePlaceholder(node.placeholder) && isSingleLineTextBody(node.textBody);
+        hasNoAutofit && isTitlePlaceholder(node.placeholder) && isSingleLineTextBody(textBody);
       textContainer.style.overflowX = 'visible';
       // noAutofit means "don't auto-fit" — NOT "clip text". PowerPoint allows text to
       // overflow the shape boundary visibly.
@@ -2533,8 +2537,8 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
       let isVerticalText = false;
       let textAnchor: string | null | undefined;
       const isSingleLineSpAutoFit =
-        !!hasSpAutoFit && !hasNormAutofit && isSingleLineTextBody(node.textBody);
-      const hasCenteredParagraphs = hasExplicitCenteredParagraph(node.textBody);
+        !!hasSpAutoFit && !hasNormAutofit && isSingleLineTextBody(textBody);
+      const hasCenteredParagraphs = hasExplicitCenteredParagraph(textBody);
 
       // Apply bodyPr (text body properties)
       // Use layout/master bodyPr as fallback for missing attributes
@@ -2656,13 +2660,13 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
               ...(isVerticalText ? { isVerticalText } : {}),
               ...(hasSpAutoFit && !hasNormAutofit
                 ? (() => {
-                    const paragraphCount = visibleParagraphCount(node.textBody);
-                    const hasExplicitSpacing = hasExplicitParagraphSpacing(node.textBody);
+                    const paragraphCount = visibleParagraphCount(textBody);
+                    const hasExplicitSpacing = hasExplicitParagraphSpacing(textBody);
                     const shouldUseOfficeWrappedLineHeight =
                       !hasExplicitSpacing &&
                       textWrap !== 'none' &&
                       (paragraphCount > 1 ||
-                        visibleTextLength(node.textBody) > IMPLICIT_SINGLE_LINE_LABEL_MAX_CHARS);
+                        visibleTextLength(textBody) > IMPLICIT_SINGLE_LINE_LABEL_MAX_CHARS);
 
                     return {
                       trimOuterParagraphSpacing: true,
@@ -2684,7 +2688,7 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
             }
           : undefined;
 
-      renderTextBody(node.textBody, node.placeholder, ctx, textContainer, textOptions);
+      renderTextBody(textBody, node.placeholder, ctx, textContainer, textOptions);
       wrapper.appendChild(textContainer);
 
       // Dynamic text fit: measure rendered text and compute any additional scale
