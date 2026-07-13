@@ -44,7 +44,9 @@
     "dist",
     "README.md",
     "CHANGELOG.md",
-    "LICENSE"
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "licenses"
   ],
   "sideEffects": [
     "./src/renderer/chart/echartsRuntime.ts",
@@ -102,7 +104,8 @@
   },
   "dependencies": {
     "echarts": "^6.0.0",
-    "jszip": "^3.10.1"
+    "jszip": "^3.10.1",
+    "mtx-decompressor": "^1.4.2"
   },
   "peerDependencies": {
     "pdfjs-dist": ">=5 <7"

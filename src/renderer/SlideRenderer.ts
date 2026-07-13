@@ -21,6 +21,8 @@ import { SafeXmlNode } from '../parser/XmlParser';
 import type { RelEntry } from '../parser/RelParser';
 import { isPlaceholderNode, parseRenderableChild } from '../model/RenderableChild';
 import type { EChartsType } from 'echarts/core';
+import { useEmbeddedFonts } from './EmbeddedFontLoader';
+import type { EmbeddedFontLimits } from './EmbeddedFontLoader';
 import type { PdfjsConfig } from '../utils/pdfRenderer';
 
 // ---------------------------------------------------------------------------
@@ -42,6 +44,8 @@ export interface SlideRendererOptions {
   pdfjs?: PdfjsConfig;
   /** Shared set of live ECharts instances for explicit disposal. */
   chartInstances?: Set<EChartsType>;
+  /** Optional embedded-font resource limit overrides. Defaults remain enforced for omitted fields. */
+  embeddedFontLimits?: EmbeddedFontLimits;
 }
 
 /**
@@ -355,6 +359,13 @@ export function renderSlide(
     restoreMeasurementMount();
   }
 
+  const embeddedFontUse = useEmbeddedFonts(
+    presentation,
+    ctx.usedEmbeddedFontFamilies ?? new Set(),
+    options?.embeddedFontLimits,
+  );
+  asyncTasks.push(embeddedFontUse.ready);
+
   // Build SlideHandle
   let disposed = false;
   const mediaUrlCache = ctx.mediaUrlCache;
@@ -364,6 +375,7 @@ export function renderSlide(
     if (disposed) return;
     disposed = true;
     abortController.abort();
+    embeddedFontUse.dispose();
 
     // Dispose chart instances whose DOM is inside this slide container
     if (chartInstances) {
